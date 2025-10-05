@@ -1,4 +1,5 @@
 import sys, os, threading, time
+from urllib.request import urlopen
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, 
     QPushButton, QSlider, QProgressBar
@@ -12,6 +13,7 @@ from stack_queue import RecentlyPlayed
 from player import MusicPlayer
 
 SONG_DIR = "songs"
+DEFAULT_COVER_URL = "https://i.pinimg.com/originals/48/71/8f/48718f3afca6b1b4296141d5cbd96619.jpg"
 
 class SpotifyStyleGUI(QWidget):
     def __init__(self):
@@ -48,11 +50,12 @@ class SpotifyStyleGUI(QWidget):
         # Right main area
         right_layout = QVBoxLayout()
 
-        # Album art placeholder
+        # Album art placeholder - Load default cover
         self.cover_label = QLabel()
-        pixmap = QPixmap(300,300)
-        pixmap.fill(Qt.GlobalColor.black)
-        self.cover_label.setPixmap(pixmap)
+        self.cover_label.setFixedSize(300, 300)
+        self.cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.cover_label.setStyleSheet("border: 2px solid #2c2c2c;")
+        self.load_default_cover()
         right_layout.addWidget(self.cover_label, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         # Song title
@@ -107,6 +110,34 @@ class SpotifyStyleGUI(QWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_progress)
         self.timer.start(500)
+
+    def load_default_cover(self):
+        """Load the default album cover from URL"""
+        try:
+            print(f"Loading default cover from URL...")
+            # Download image data
+            with urlopen(DEFAULT_COVER_URL) as response:
+                image_data = response.read()
+            
+            # Load into pixmap
+            pixmap = QPixmap()
+            if pixmap.loadFromData(image_data):
+                scaled_pixmap = pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio, 
+                                             Qt.TransformationMode.SmoothTransformation)
+                self.cover_label.setPixmap(scaled_pixmap)
+                print("✓ Default cover loaded successfully!")
+            else:
+                print("✗ Failed to parse image data")
+                self.set_fallback_cover()
+        except Exception as e:
+            print(f"✗ Failed to load image: {e}")
+            self.set_fallback_cover()
+    
+    def set_fallback_cover(self):
+        """Set a fallback black square if image doesn't load"""
+        pixmap = QPixmap(300, 300)
+        pixmap.fill(Qt.GlobalColor.darkGray)
+        self.cover_label.setPixmap(pixmap)
 
     def load_songs(self):
         if not os.path.exists(SONG_DIR):

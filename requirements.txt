@@ -1,3 +1,4 @@
 PyQt6==6.7.1
 pygame==2.6.1
 mutagen==1.46.0
+pillow
