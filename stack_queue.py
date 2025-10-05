@@ -4,31 +4,26 @@ from collections import deque
 from typing import Optional
 
 class RecentlyPlayed:
-    def __init__(self, max_size: int = 200):
-        self._stack = []
-        self.max_size = max_size
+    def __init__(self):
+        self.stack = []
 
-    def push(self, title: str) -> None:
-        self._stack.append(title)
-        # keep last max_size entries
-        if len(self._stack) > self.max_size:
-            self._stack.pop(0)
+    def push(self, title):
+        self.stack.append(title)
 
-    def pop(self) -> Optional[str]:
-        if self._stack:
-            return self._stack.pop()
+    def pop(self):
+        if self.stack:
+            return self.stack.pop()
         return None
 
-    def clear(self) -> None:
-        self._stack.clear()
+    def get_all(self):
+        # Return list of songs most recent first
+        return self.stack[::-1]
 
-    def show(self) -> None:
-        if not self._stack:
-            print("No recently played songs.")
-            return
-        print("\n🎧 Recently Played Songs:")
-        for i, t in enumerate(reversed(self._stack), 1):
-            print(f"{i}. {t}")
+    def clear(self):
+        self.stack.clear()
+
+    def __len__(self):
+        return len(self.stack)
 
 
 class UpcomingSongs:
