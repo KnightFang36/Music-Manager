@@ -11,13 +11,12 @@ import threading
 import time
 
 SONG_DIR = "songs"
-COVER_DIR = "covers"
 
-class MusicManagerGUI:
+class SpotifyGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("🎵 Music Manager Pro")
-        self.root.geometry("800x400")
+        self.root.title("🎵 Music Manager - Spotify Style")
+        self.root.geometry("900x500")
         self.root.configure(bg="#121212")
 
         # Core modules
@@ -27,80 +26,70 @@ class MusicManagerGUI:
         self.heap = SongHeap()
         self.player = MusicPlayer()
         self.current_node = None
-        self.current_cover = None
         self.playing = False
 
         # UI
-        self.create_widgets()
+        self.create_ui()
         self.load_songs()
 
-    def create_widgets(self):
-        # Split layout
-        self.left_frame = tk.Frame(self.root, bg="#1e1e1e", width=300)
-        self.left_frame.pack(side="left", fill="y")
+    def create_ui(self):
+        # Left sidebar
+        self.sidebar = tk.Frame(self.root, bg="#1e1e1e", width=220)
+        self.sidebar.pack(side="left", fill="y")
 
-        self.right_frame = tk.Frame(self.root, bg="#121212")
-        self.right_frame.pack(side="right", fill="both", expand=True)
+        tk.Label(self.sidebar, text="🎵 Playlist", font=("Segoe UI", 16, "bold"),
+                 bg="#1e1e1e", fg="#FFD700").pack(pady=10)
 
-        # Playlist label
-        tk.Label(self.left_frame, text="🎵 Playlist", font=("Segoe UI", 16, "bold"),
-                 fg="#FFD700", bg="#1e1e1e").pack(pady=10)
+        self.listbox = tk.Listbox(self.sidebar, bg="#2c2c2c", fg="white",
+                                  selectbackground="#FF4500", font=("Consolas", 12))
+        self.listbox.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # Playlist listbox
-        self.scrollbar = tk.Scrollbar(self.left_frame)
-        self.scrollbar.pack(side="right", fill="y")
-        self.listbox = tk.Listbox(self.left_frame, bg="#2c2c2c", fg="white", font=("Consolas", 11),
-                                  selectbackground="#FF4500", activestyle="none", width=35)
-        self.listbox.pack(side="left", fill="y", expand=True)
-        self.listbox.config(yscrollcommand=self.scrollbar.set)
-        self.scrollbar.config(command=self.listbox.yview)
+        # Main area
+        self.main_area = tk.Frame(self.root, bg="#121212")
+        self.main_area.pack(side="right", fill="both", expand=True)
 
-        # Right frame: Cover, progress, controls
-        self.cover_label = tk.Label(self.right_frame, bg="#121212")
-        self.cover_label.pack(pady=10)
+        # Album cover
+        self.cover_label = tk.Label(self.main_area, bg="#121212")
+        self.cover_label.pack(pady=20)
 
         # Current song label
-        self.status_label = tk.Label(self.right_frame, text="No song playing", font=("Segoe UI", 14, "bold"),
-                                     fg="white", bg="#121212")
-        self.status_label.pack(pady=5)
+        self.current_label = tk.Label(self.main_area, text="No song playing",
+                                      font=("Segoe UI", 16, "bold"), fg="white", bg="#121212")
+        self.current_label.pack(pady=5)
 
         # Progress bar
         self.progress_var = tk.DoubleVar()
-        self.progress_bar = ttk.Progressbar(self.right_frame, variable=self.progress_var, maximum=100,
-                                            length=400, style="orange.Horizontal.TProgressbar")
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("orange.Horizontal.TProgressbar", troughcolor="#2c2c2c", background="#FF4500", thickness=10)
+        self.progress_bar = ttk.Progressbar(self.main_area, variable=self.progress_var, maximum=100,
+                                            style="orange.Horizontal.TProgressbar", length=600)
         self.progress_bar.pack(pady=10)
 
-        # Buttons frame
-        btn_frame = tk.Frame(self.right_frame, bg="#121212")
-        btn_frame.pack(pady=10)
+        # Bottom control bar
+        control_frame = tk.Frame(self.main_area, bg="#121212")
+        control_frame.pack(pady=10)
 
-        style = {"width": 10, "font": ("Segoe UI", 10, "bold"), "bg": "#FF4500", "fg": "white"}
-        tk.Button(btn_frame, text="▶ Play", command=self.play_selected, **style).grid(row=0, column=0, padx=5)
-        tk.Button(btn_frame, text="⏸ Pause", command=self.pause_song, **style).grid(row=0, column=1, padx=5)
-        tk.Button(btn_frame, text="⏹ Stop", command=self.stop_song, **style).grid(row=0, column=2, padx=5)
-        tk.Button(btn_frame, text="⏵ Next", command=self.next_song, **style).grid(row=0, column=3, padx=5)
-        tk.Button(btn_frame, text="⏴ Prev", command=self.prev_song, **style).grid(row=0, column=4, padx=5)
+        btn_style = {"width": 6, "font": ("Segoe UI", 12, "bold"), "bg": "#FF4500", "fg": "white"}
+        tk.Button(control_frame, text="⏴", command=self.prev_song, **btn_style).grid(row=0, column=0, padx=5)
+        tk.Button(control_frame, text="▶", command=self.play_selected, **btn_style).grid(row=0, column=1, padx=5)
+        tk.Button(control_frame, text="⏸", command=self.pause_song, **btn_style).grid(row=0, column=2, padx=5)
+        tk.Button(control_frame, text="⏵", command=self.next_song, **btn_style).grid(row=0, column=3, padx=5)
 
-        # Volume slider
-        vol_frame = tk.Frame(self.right_frame, bg="#121212")
-        vol_frame.pack(pady=5)
-        tk.Label(vol_frame, text="Volume", fg="white", bg="#121212").pack(side="left", padx=5)
-        self.volume_slider = tk.Scale(vol_frame, from_=0, to=100, orient="horizontal", bg="#121212",
-                                      fg="white", troughcolor="#555555", command=self.set_volume)
+        # Volume
+        volume_frame = tk.Frame(self.main_area, bg="#121212")
+        volume_frame.pack(pady=10)
+        tk.Label(volume_frame, text="Volume", fg="white", bg="#121212").pack(side="left")
+        self.volume_slider = tk.Scale(volume_frame, from_=0, to=100, orient="horizontal",
+                                      bg="#121212", fg="white", troughcolor="#555555", command=self.set_volume)
         self.volume_slider.set(80)
         self.volume_slider.pack(side="left")
-
-        # Progress bar style
-        style = ttk.Style()
-        style.theme_use('clam')
-        style.configure("orange.Horizontal.TProgressbar", troughcolor="#1e1e1e", background="#FF4500")
 
     def load_songs(self):
         if not os.path.exists(SONG_DIR):
             os.makedirs(SONG_DIR)
         self.playlist.load_from_folder(SONG_DIR)
         self.song_map.rebuild_from_playlist(self.playlist)
-
         self.listbox.delete(0, tk.END)
         cur = self.playlist.head
         toggle_color = True
@@ -112,16 +101,6 @@ class MusicManagerGUI:
             cur = cur.next
         if self.listbox.size() == 0:
             self.listbox.insert(tk.END, "No songs found in songs/ folder")
-
-    def show_cover(self, song_title):
-        img_path = os.path.join(COVER_DIR, f"{song_title}.jpg")
-        if not os.path.exists(img_path):
-            self.cover_label.config(image="", text="🎵 No Cover", font=("Segoe UI", 16), fg="white")
-            return
-        img = Image.open(img_path)
-        img = img.resize((200, 200))
-        self.current_cover = ImageTk.PhotoImage(img)
-        self.cover_label.config(image=self.current_cover, text="")
 
     def play_selected(self):
         idx = self.listbox.curselection()
@@ -137,16 +116,14 @@ class MusicManagerGUI:
 
     def play_node(self, node):
         self.current_node = node
-        self.status_label.config(text=f"🎶 Now Playing: {node.title}")
+        self.current_label.config(text=f"🎶 {node.title}")
         self.player.play(node.path)
         self.history.push(node.title)
         self.heap.add_play(node.title)
-        self.show_cover(node.title)
         self.playing = True
         threading.Thread(target=self.update_progress, daemon=True).start()
 
     def update_progress(self):
-        # Simulated progress bar (pygame cannot give exact duration easily)
         self.progress_var.set(0)
         while self.playing and self.player.is_playing():
             self.progress_var.set(min(100, self.progress_var.get() + 1))
@@ -155,12 +132,10 @@ class MusicManagerGUI:
 
     def pause_song(self):
         self.player.pause()
-        self.status_label.config(text="⏸ Paused")
         self.playing = False
 
     def stop_song(self):
         self.player.stop()
-        self.status_label.config(text="⏹ Stopped")
         self.playing = False
         self.progress_var.set(0)
 
@@ -168,19 +143,18 @@ class MusicManagerGUI:
         if self.current_node and self.current_node.next:
             self.play_node(self.current_node.next)
         else:
-            messagebox.showinfo("Info", "This is the last song in playlist.")
+            messagebox.showinfo("Info", "This is the last song.")
 
     def prev_song(self):
         if self.current_node and self.current_node.prev:
             self.play_node(self.current_node.prev)
         else:
-            messagebox.showinfo("Info", "This is the first song in playlist.")
+            messagebox.showinfo("Info", "This is the first song.")
 
     def set_volume(self, val):
-        vol = int(val) / 100
-        self.player.set_volume(vol)
+        self.player.set_volume(int(val)/100)
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = MusicManagerGUI(root)
+    app = SpotifyGUI(root)
     root.mainloop()
