@@ -18,7 +18,7 @@ DATA_DIR = os.path.join(BASE_DIR, 'data')
 SONG_DIR = os.path.join(BASE_DIR, "songs")
 PLAY_COUNTS = os.path.join(DATA_DIR, 'play_counts.json')
 RECENT_HISTORY = os.path.join(DATA_DIR, 'recently_played.json')
-DEFAULT_COVER_URL = "https://i.pinimg.com/originals/48/71/8f/48718f3afca6b1b4296141d5cbd96619.jpg"
+DEFAULT_COVER_URL = "https://cbx-prod.b-cdn.net/COLOURBOX20357576.jpg?width=480&height=480&quality=70"
 
 # ----------------- Utility Functions -----------------
 def ensure_dirs():
@@ -69,7 +69,7 @@ class ModernMusicPlayer(QWidget):
         self.setGeometry(100, 100, 1600, 900)
         self.setStyleSheet("""
             QWidget {
-                background-color: #121212;
+                background-color: #0A0A0A;
                 color: #ffffff;
                 font-family: 'Segoe UI', 'San Francisco', 'Arial';
             }
@@ -111,7 +111,7 @@ class ModernMusicPlayer(QWidget):
         sidebar.setStyleSheet("""
             QFrame {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(30, 30, 30, 0.85), stop:1 rgba(15, 15, 15, 0.85));
+                    stop:0 rgba(15, 15, 15, 0.85), stop:1 rgba(10, 10, 10, 0.85));
                 border-right: 1px solid rgba(60, 60, 60, 0.5);
             }
         """)
@@ -125,7 +125,7 @@ class ModernMusicPlayer(QWidget):
         app_title.setStyleSheet("""
             font-size: 26px;
             font-weight: 700;
-            color: #FF6B35;
+            color: #D94F00;
             letter-spacing: 2px;
             padding: 10px 0;
         """)
@@ -167,11 +167,11 @@ class ModernMusicPlayer(QWidget):
                 border: 1px solid rgba(80, 80, 80, 0.5);
             }
             QCheckBox::indicator:checked {
-                background-color: #FF6B35;
-                border: 1px solid #FF6B35;
+                background-color: #D94F00;
+                border: 1px solid #D94F00;
             }
             QCheckBox::indicator:hover {
-                border: 1px solid #FF6B35;
+                border: 1px solid #E55B00;
             }
         """)
         self.sort_toggle.stateChanged.connect(self.update_playlist_display)
@@ -182,7 +182,7 @@ class ModernMusicPlayer(QWidget):
         self.search_input.setPlaceholderText("🔍 Search songs...")
         self.search_input.setStyleSheet("""
             QLineEdit {
-                background-color: rgba(30, 30, 30, 0.8);
+                background-color: rgba(10, 10, 10, 0.8);
                 color: #ffffff;
                 border: 1px solid rgba(60, 60, 60, 0.5);
                 border-radius: 8px;
@@ -190,8 +190,8 @@ class ModernMusicPlayer(QWidget):
                 font-size: 14px;
             }
             QLineEdit:focus {
-                border: 1px solid #FF6B35;
-                background-color: rgba(40, 40, 40, 0.8);
+                border: 1px solid #D94F00;
+                background-color: rgba(15, 15, 15, 0.8);
             }
             QLineEdit::placeholder {
                 color: #666666;
@@ -200,7 +200,7 @@ class ModernMusicPlayer(QWidget):
         self.search_input.textChanged.connect(self.update_playlist_display)
         side_layout.addWidget(self.search_input)
 
-        # Playlist List
+        # Playlist List (Larger)
         self.list_widget = QListWidget()
         self.list_widget.setStyleSheet("""
             QListWidget {
@@ -217,18 +217,19 @@ class ModernMusicPlayer(QWidget):
                 margin: 2px 0;
             }
             QListWidget::item:hover {
-                background-color: rgba(40, 40, 40, 0.7);
-                color: #ffffff;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D94F00, stop:1 #E56A00);
+                color: #000000;
             }
             QListWidget::item:selected {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #FF6B35, stop:1 #FF8C42);
-                color: #ffffff;
+                    stop:0 #D94F00, stop:1 #E56A00);
+                color: #000000;
                 font-weight: 600;
             }
             QScrollBar:vertical {
                 border: none;
-                background-color: rgba(30, 30, 30, 0.8);
+                background-color: rgba(10, 10, 10, 0.8);
                 width: 8px;
                 border-radius: 4px;
             }
@@ -238,18 +239,18 @@ class ModernMusicPlayer(QWidget):
                 min-height: 20px;
             }
             QScrollBar::handle:vertical:hover {
-                background-color: #FF6B35;
+                background-color: #D94F00;
             }
         """)
-        side_layout.addWidget(self.list_widget)
+        side_layout.addWidget(self.list_widget, stretch=3)
 
         # Enqueue Button
         self.enqueue_btn = QPushButton("ADD TO QUEUE")
         self.enqueue_btn.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #FF6B35, stop:1 #FF8C42);
-                color: white;
+                    stop:0 #D94F00, stop:1 #E56A00);
+                color: #000000;
                 border: none;
                 border-radius: 8px;
                 padding: 12px;
@@ -259,11 +260,11 @@ class ModernMusicPlayer(QWidget):
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #FF7B45, stop:1 #FF9C52);
+                    stop:0 #E55B00, stop:1 #F57600);
             }
             QPushButton:pressed {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #E55B25, stop:1 #E57C32);
+                    stop:0 #C74300, stop:1 #D45F00);
             }
         """)
         self.enqueue_btn.clicked.connect(self.enqueue_selected)
@@ -275,7 +276,7 @@ class ModernMusicPlayer(QWidget):
         divider2.setStyleSheet("background-color: rgba(60, 60, 60, 0.5); max-height: 1px; margin: 10px 0;")
         side_layout.addWidget(divider2)
 
-        # Upcoming Queue
+        # Upcoming Queue (Smaller)
         up_label = QLabel("UP NEXT")
         up_label.setStyleSheet("""
             font-size: 13px;
@@ -286,6 +287,7 @@ class ModernMusicPlayer(QWidget):
         side_layout.addWidget(up_label)
 
         self.upcoming_list = QListWidget()
+        self.upcoming_list.setMaximumHeight(100)
         self.upcoming_list.setStyleSheet("""
             QListWidget {
                 background-color: transparent;
@@ -300,19 +302,20 @@ class ModernMusicPlayer(QWidget):
                 margin: 1px 0;
             }
             QListWidget::item:hover {
-                background-color: rgba(40, 40, 40, 0.7);
-                color: #ffffff;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D94F00, stop:1 #E56A00);
+                color: #000000;
             }
         """)
-        side_layout.addWidget(self.upcoming_list)
+        side_layout.addWidget(self.upcoming_list, stretch=1)
 
         # Play Next Button
         self.play_next_upcoming_btn = QPushButton("▶ PLAY NEXT")
         self.play_next_upcoming_btn.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #FF6B35, stop:1 #FF8C42);
-                color: white;
+                    stop:0 #D94F00, stop:1 #E56A00);
+                color: #000000;
                 border: none;
                 border-radius: 8px;
                 padding: 10px;
@@ -321,11 +324,11 @@ class ModernMusicPlayer(QWidget):
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #FF7B45, stop:1 #FF9C52);
+                    stop:0 #E55B00, stop:1 #F57600);
             }
             QPushButton:pressed {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #E55B25, stop:1 #E57C32);
+                    stop:0 #C74300, stop:1 #D45F00);
             }
         """)
         self.play_next_upcoming_btn.clicked.connect(self.play_next_from_upcoming)
@@ -335,7 +338,7 @@ class ModernMusicPlayer(QWidget):
 
         # ----------------- Center Content -----------------
         center_container = QFrame()
-        center_container.setStyleSheet("background-color: #121212;")
+        center_container.setStyleSheet("background-color: #0A0A0A;")
         center_layout = QVBoxLayout(center_container)
         center_layout.setContentsMargins(60, 40, 60, 40)
         center_layout.setSpacing(0)
@@ -354,7 +357,7 @@ class ModernMusicPlayer(QWidget):
         cover_container.setFixedSize(420, 420)
         cover_container.setStyleSheet("""
             QFrame {
-                background-color: rgba(30, 30, 30, 0.8);
+                background-color: rgba(10, 10, 10, 0.8);
                 border-radius: 12px;
             }
         """)
@@ -366,7 +369,7 @@ class ModernMusicPlayer(QWidget):
         self.cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cover_label.setStyleSheet("""
             border-radius: 8px;
-            background-color: #1a1a1a;
+            background-color: #0A0A0A;
         """)
         self.load_default_cover()
         cover_layout.addWidget(self.cover_label)
@@ -397,7 +400,7 @@ class ModernMusicPlayer(QWidget):
         top_card_frame.setStyleSheet("""
             QFrame {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(30, 30, 30, 0.85), stop:1 rgba(20, 20, 20, 0.85));
+                    stop:0 rgba(20, 20, 20, 0.85), stop:1 rgba(10, 10, 10, 0.85));
                 border: 1px solid rgba(60, 60, 60, 0.5);
                 border-radius: 12px;
             }
@@ -413,7 +416,7 @@ class ModernMusicPlayer(QWidget):
         top_header.setStyleSheet("""
             font-size: 14px;
             font-weight: 700;
-            color: #FF6B35;
+            color: #D94F00;
             letter-spacing: 1px;
         """)
         top_card_layout.addWidget(top_header)
@@ -432,8 +435,9 @@ class ModernMusicPlayer(QWidget):
                 margin: 2px 0;
             }
             QListWidget::item:hover {
-                background-color: rgba(255, 107, 53, 0.2);
-                color: #FF8C42;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D94F00, stop:1 #E56A00);
+                color: #000000;
             }
         """)
         top_card_layout.addWidget(self.top_played_list)
@@ -444,7 +448,7 @@ class ModernMusicPlayer(QWidget):
         recent_card_frame.setStyleSheet("""
             QFrame {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(30, 30, 30, 0.85), stop:1 rgba(20, 20, 20, 0.85));
+                    stop:0 rgba(20, 20, 20, 0.85), stop:1 rgba(10, 10, 10, 0.85));
                 border: 1px solid rgba(60, 60, 60, 0.5);
                 border-radius: 12px;
             }
@@ -460,7 +464,7 @@ class ModernMusicPlayer(QWidget):
         recent_header.setStyleSheet("""
             font-size: 14px;
             font-weight: 700;
-            color: #FF6B35;
+            color: #D94F00;
             letter-spacing: 1px;
         """)
         recent_card_layout.addWidget(recent_header)
@@ -479,8 +483,9 @@ class ModernMusicPlayer(QWidget):
                 margin: 2px 0;
             }
             QListWidget::item:hover {
-                background-color: rgba(255, 107, 53, 0.2);
-                color: #FF8C42;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D94F00, stop:1 #E56A00);
+                color: #000000;
             }
         """)
         recent_card_layout.addWidget(self.history_list)
@@ -497,7 +502,7 @@ class ModernMusicPlayer(QWidget):
         player_bar.setStyleSheet("""
             QFrame {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(30, 30, 30, 0.85), stop:1 rgba(15, 15, 15, 0.85));
+                    stop:0 rgba(15, 15, 15, 0.85), stop:1 rgba(10, 10, 10, 0.85));
                 border-top: 1px solid rgba(60, 60, 60, 0.5);
             }
         """)
@@ -520,7 +525,7 @@ class ModernMusicPlayer(QWidget):
             }
             QSlider::sub-page:horizontal {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #FF6B35, stop:1 #FF8C42);
+                    stop:0 #D94F00, stop:1 #E56A00);
                 border-radius: 3px;
             }
             QSlider::handle:horizontal {
@@ -531,7 +536,7 @@ class ModernMusicPlayer(QWidget):
                 margin: -5px 0;
             }
             QSlider::handle:horizontal:hover {
-                background: #FF6B35;
+                background: #D94F00;
             }
         """)
         self.progress_slider.sliderPressed.connect(lambda: setattr(self, 'slider_being_dragged', True))
@@ -544,30 +549,103 @@ class ModernMusicPlayer(QWidget):
         progress_layout.addWidget(self.total_time_label)
         player_layout.addLayout(progress_layout)
 
-        # Controls Row
+        # Playback and Volume Controls (Side by Side)
         controls_row = QHBoxLayout()
-        
-        # Left: Volume
-        vol_layout = QHBoxLayout()
+        controls_row.setSpacing(20)
+        controls_row.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+
+        # Playback Controls
+        playback_frame = QFrame()
+        playback_frame.setFixedWidth(200)
+        playback_layout = QHBoxLayout(playback_frame)
+        playback_layout.setSpacing(15)
+        playback_layout.setContentsMargins(0, 0, 0, 0)
+        playback_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+
+        btn_style = """
+            QPushButton {
+                background-color: transparent;
+                color: #dddddd;
+                border: none;
+                font-size: 18px;
+                padding: 10px;
+                border-radius: 25px;
+                min-width: 50px;
+                min-height: 50px;
+            }
+            QPushButton:hover {
+                background-color: transparent;
+                color: #D94F00;
+            }
+            QPushButton:pressed {
+                background-color: transparent;
+                color: #C74300;
+            }
+        """
+
+        self.prev_btn = QPushButton("<<")
+        self.prev_btn.setStyleSheet(btn_style)
+        self.prev_btn.clicked.connect(self.prev_song)
+        playback_layout.addWidget(self.prev_btn)
+
+        self.play_pause_btn = QPushButton("|> ")
+        self.play_pause_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ffffff;
+                color: #000000;
+                border: none;
+                font-size: 18px;
+                padding: 10px;
+                border-radius: 25px;
+                min-width: 50px;
+                min-height: 50px;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+                color: #000000;
+            }
+            QPushButton:pressed {
+                background-color: #cccccc;
+                color: #000000;
+            }
+        """)
+        self.play_pause_btn.clicked.connect(self.toggle_play_pause)
+        playback_layout.addWidget(self.play_pause_btn)
+
+        self.next_btn = QPushButton(">>")
+        self.next_btn.setStyleSheet(btn_style)
+        self.next_btn.clicked.connect(self.next_song)
+        playback_layout.addWidget(self.next_btn)
+
+        controls_row.addWidget(playback_frame)
+
+        # Volume Control
+        volume_frame = QFrame()
+        volume_frame.setFixedWidth(300)
+        vol_layout = QHBoxLayout(volume_frame)
+        vol_layout.setContentsMargins(0, 0, 0, 0)
+        vol_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+
         vol_icon = QLabel("🔊")
         vol_icon.setStyleSheet("font-size: 18px;")
         vol_layout.addWidget(vol_icon)
         
         self.vol_slider = QSlider(Qt.Orientation.Horizontal)
-        self.vol_slider.setFixedWidth(120)
+        self.vol_slider.setFixedWidth(200)
         self.vol_slider.setValue(80)
         self.vol_slider.setStyleSheet("""
             QSlider::groove:horizontal {
-                background: rgba(60, 60, 60, 0.7);
+                background: transparent;
                 height: 5px;
                 border-radius: 2px;
             }
             QSlider::sub-page:horizontal {
-                background: #FF6B35;
+                background: #D94F00;
                 border-radius: 2px;
             }
             QSlider::handle:horizontal {
-                background: white;
+                background: transparent;
+                border: 1px solid #D94F00;
                 width: 12px;
                 height: 12px;
                 border-radius: 6px;
@@ -580,73 +658,8 @@ class ModernMusicPlayer(QWidget):
         self.vol_percentage_label = QLabel("80%")
         self.vol_percentage_label.setStyleSheet("color: #999999; font-size: 12px; min-width: 35px;")
         vol_layout.addWidget(self.vol_percentage_label)
-        controls_row.addLayout(vol_layout)
-
-        controls_row.addStretch()
-
-        # Center: Playback Controls
-        playback_controls = QHBoxLayout()
-        playback_controls.setSpacing(15)
-
-        btn_style = """
-            QPushButton {
-                background-color: transparent;
-                color: #dddddd;
-                border: none;
-                font-size: 22px;
-                padding: 10px;
-                border-radius: 25px;
-                min-width: 50px;
-                min-height: 50px;
-            }
-            QPushButton:hover {
-                color: #FF6B35;
-                background-color: rgba(40, 40, 40, 0.7);
-            }
-            QPushButton:pressed {
-                color: #FF8C42;
-                background-color: rgba(60, 60, 60, 0.7);
-            }
-        """
-
-        self.prev_btn = QPushButton("⏮")
-        self.prev_btn.setStyleSheet(btn_style)
-        self.prev_btn.clicked.connect(self.prev_song)
-        playback_controls.addWidget(self.prev_btn)
-
-        self.play_pause_btn = QPushButton("▶")
-        self.play_pause_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #FF6B35, stop:1 #FF8C42);
-                color: white;
-                border: none;
-                font-size: 24px;
-                padding: 12px;
-                border-radius: 30px;
-                min-width: 60px;
-                min-height: 60px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #FF7B45, stop:1 #FF9C52);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #E55B25, stop:1 #E57C32);
-            }
-        """)
-        self.play_pause_btn.clicked.connect(self.toggle_play_pause)
-        playback_controls.addWidget(self.play_pause_btn)
-
-        self.next_btn = QPushButton("⏭")
-        self.next_btn.setStyleSheet(btn_style)
-        self.next_btn.clicked.connect(self.next_song)
-        playback_controls.addWidget(self.next_btn)
-
-        controls_row.addLayout(playback_controls)
-        controls_row.addStretch()
-
+        
+        controls_row.addWidget(volume_frame)
         player_layout.addLayout(controls_row)
 
         center_layout.addWidget(player_bar)
@@ -716,7 +729,7 @@ class ModernMusicPlayer(QWidget):
             self.cover_label.setPixmap(pix)
         except:
             pix = QPixmap(400, 400)
-            pix.fill(QColor("#1a1a1a"))
+            pix.fill(QColor("#0A0A0A"))
             self.cover_label.setPixmap(pix)
 
     def try_set_cover(self, path):
@@ -772,7 +785,7 @@ class ModernMusicPlayer(QWidget):
         save_play_counts(self.heap)
         save_recent_history(self.history)
         self.playing = True
-        self.play_pause_btn.setText("⏸")
+        self.play_pause_btn.setText("||")
         if not self.try_set_cover(node.path):
             pass
         # Duration
@@ -793,7 +806,7 @@ class ModernMusicPlayer(QWidget):
         if self.playing:
             self.player.pause()
             self.playing = False
-            self.play_pause_btn.setText("▶")
+            self.play_pause_btn.setText("|> ")
         else:
             if self.current_node:
                 self.play_node(self.current_node)
@@ -822,10 +835,14 @@ class ModernMusicPlayer(QWidget):
                 self.current_time_label.setText(f"{int(pos//60)}:{int(pos%60):02d}")
                 if not pygame.mixer.music.get_busy() and self.playing:
                     self.playing = False
-                    self.play_pause_btn.setText("▶")
+                    self.play_pause_btn.setText("|> ")
                     self.next_song()
-            except:
-                pass
+            except KeyboardInterrupt:
+                print("Program interrupted by user")
+                self.player.stop()
+                sys.exit(0)
+            except Exception as e:
+                print(f"Error in update_progress: {e}")
 
     # ----------------- Top & Recent -----------------
     def update_top_played_ui(self):
