@@ -1,9 +1,9 @@
-# player.py
-# Uses pygame.mixer to play audio in a background thread and expose pause/resume/stop
-import threading
-import time
+
+# --- pygame-based MusicPlayer backend ---
 import os
 import pygame
+import threading
+import time
 
 class MusicPlayer:
     def __init__(self):
@@ -13,13 +13,12 @@ class MusicPlayer:
         self.paused = False
         self.current_path: str | None = None
 
-    def _play_worker(self, path: str):
+    def _play_worker(self, path: str, start: float = 0.0):
         try:
             pygame.mixer.music.load(path)
-            pygame.mixer.music.play()
-            # loop while music is playing and not asked to stop
+            pygame.mixer.music.play(start=start)
             while not self.stop_event.is_set() and pygame.mixer.music.get_busy():
-                time.sleep(0.2)
+                time.sleep(0.1)
         except Exception as e:
             print("Playback error:", e)
         finally:
@@ -28,7 +27,7 @@ class MusicPlayer:
             except Exception:
                 pass
 
-    def play(self, path: str) -> None:
+    def play(self, path: str, start: float = 0.0) -> None:
         if not os.path.exists(path):
             print("File not found:", path)
             return
@@ -36,7 +35,7 @@ class MusicPlayer:
         self.stop_event.clear()
         self.paused = False
         self.current_path = path
-        self.play_thread = threading.Thread(target=self._play_worker, args=(path,), daemon=True)
+        self.play_thread = threading.Thread(target=self._play_worker, args=(path, start), daemon=True)
         self.play_thread.start()
 
     def stop(self) -> None:
@@ -46,7 +45,6 @@ class MusicPlayer:
         except Exception:
             pass
         if self.play_thread and self.play_thread.is_alive():
-            # give thread a moment to close
             self.play_thread.join(timeout=0.5)
         self.play_thread = None
         self.stop_event.clear()
@@ -76,7 +74,6 @@ class MusicPlayer:
         return self.paused
 
     def set_volume(self, vol: float) -> None:
-        # vol between 0.0 and 1.0
         try:
             pygame.mixer.music.set_volume(max(0.0, min(1.0, vol)))
         except Exception:
