@@ -14,9 +14,8 @@ from stack_queue import RecentlyPlayed, UpcomingSongs
 from player import MusicPlayer
 import pygame
 import time
-import hashlib
 
-# Suppress all Qt warnings, including qt.gui.imageio
+# Suppress all Qt warnings (optional)
 os.environ["QT_LOGGING_RULES"] = "qt*=false"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,13 +25,11 @@ PLAY_COUNTS = os.path.join(DATA_DIR, 'play_counts.json')
 RECENT_HISTORY = os.path.join(DATA_DIR, 'recently_played.json')
 DEFAULT_COVER_URL = "https://i.redd.it/wo1p6792qi371.png"
 DEFAULT_COVER_PATH = os.path.join(DATA_DIR, 'default_cover.png')
-COVER_CACHE_DIR = os.path.join(DATA_DIR, 'cover_cache')
 
 # ----------------- Utility Functions -----------------
 def ensure_dirs():
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(SONG_DIR, exist_ok=True)
-    os.makedirs(COVER_CACHE_DIR, exist_ok=True)
 
 def cache_default_cover():
     """Cache the default cover image locally to avoid repeated network requests."""
@@ -181,9 +178,8 @@ class ModernMusicPlayer(QWidget):
         self.last_top_played = []
         self.last_recently_played = []
         self.last_upcoming = []
-        self.cover_cache = {}  # Cache for embedded cover art paths
 
-        # Timer for UI sync (200ms for reduced frequency)
+        # Timer for UI sync
         self.progress_timer = QTimer(self)
         self.progress_timer.timeout.connect(self.update_progress)
         self.progress_timer.start(200)
@@ -271,9 +267,6 @@ class ModernMusicPlayer(QWidget):
                 background-color: #D94F00;
                 border: 1px solid #D94F00;
             }
-            QCheckBox::indicator:hover {
-                border: 1px solid #E55B00;
-            }
         """)
         self.sort_toggle.stateChanged.connect(self.update_playlist_display)
         side_layout.addWidget(self.sort_toggle)
@@ -328,27 +321,6 @@ class ModernMusicPlayer(QWidget):
                 color: #000000;
                 font-weight: 600;
             }
-            QScrollBar:vertical {
-                border: none;
-                background-color: transparent;
-                width: 1px;
-                margin: 0;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #D3D3D3;
-                border-radius: 0.5px;
-                min-height: 10px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: rgba(211, 211, 211, 0.8);
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0;
-                background: none;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
         """)
         side_layout.addWidget(self.list_widget, stretch=3)
 
@@ -370,21 +342,16 @@ class ModernMusicPlayer(QWidget):
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #E55B00, stop:1 #F57600);
             }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #C74300, stop:1 #D45F00);
-            }
         """)
         self.enqueue_btn.clicked.connect(self.enqueue_selected)
         side_layout.addWidget(self.enqueue_btn)
 
-        # Divider
+        # Upcoming Queue
         divider2 = QFrame()
         divider2.setFrameShape(QFrame.Shape.HLine)
         divider2.setStyleSheet("background-color: rgba(60, 60, 60, 0.5); max-height: 1px; margin: 10px 0;")
         side_layout.addWidget(divider2)
 
-        # Upcoming Queue
         up_label = QLabel("UP NEXT")
         up_label.setStyleSheet("""
             font-size: 13px;
@@ -414,31 +381,9 @@ class ModernMusicPlayer(QWidget):
                     stop:0 #D94F00, stop:1 #E56A00);
                 color: #000000;
             }
-            QScrollBar:vertical {
-                border: none;
-                background-color: transparent;
-                width: 1px;
-                margin: 0;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #D3D3D3;
-                border-radius: 0.5px;
-                min-height: 10px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: rgba(211, 211, 211, 0.8);
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0;
-                background: none;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
         """)
         side_layout.addWidget(self.upcoming_list, stretch=1)
 
-        # Play Next Button
         self.play_next_upcoming_btn = QPushButton("▶ PLAY NEXT")
         self.play_next_upcoming_btn.setStyleSheet("""
             QPushButton {
@@ -451,19 +396,10 @@ class ModernMusicPlayer(QWidget):
                 font-size: 12px;
                 font-weight: 600;
             }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #E55B00, stop:1 #F57600);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #C74300, stop:1 #D45F00);
-            }
         """)
         self.play_next_upcoming_btn.clicked.connect(self.play_next_from_upcoming)
         side_layout.addWidget(self.play_next_upcoming_btn)
 
-        # Autoplay Checkbox
         self.autoplay_checkbox = QCheckBox("🔄 Autoplay Queue")
         self.autoplay_checkbox.setStyleSheet("""
             QCheckBox {
@@ -500,10 +436,10 @@ class ModernMusicPlayer(QWidget):
         content_area = QHBoxLayout()
         content_area.setSpacing(60)
 
-        # Album Cover Section
+        # Album Cover Section (centered and fixed size)
         album_section = QVBoxLayout()
         album_section.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        album_section.setSpacing(50)
+        album_section.setSpacing(20)
 
         cover_container = QFrame()
         cover_container.setFixedSize(650, 750)
@@ -542,7 +478,7 @@ class ModernMusicPlayer(QWidget):
 
         content_area.addLayout(album_section)
 
-        # Stats Section
+        # Stats Section (Top Played + Recently Played)
         stats_section = QVBoxLayout()
         stats_section.setAlignment(Qt.AlignmentFlag.AlignTop)
         stats_section.setSpacing(25)
@@ -591,41 +527,13 @@ class ModernMusicPlayer(QWidget):
                     stop:0 #D94F00, stop:1 #E56A00);
                 color: #000000;
             }
-            QScrollBar:vertical {
-                border: none;
-                background-color: transparent;
-                width: 1px;
-                margin: 0;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #D3D3D3;
-                border-radius: 0.5px;
-                min-height: 10px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: rgba(211, 211, 211, 0.8);
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0;
-                background: none;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
         """)
         top_card_layout.addWidget(self.top_played_list)
         stats_section.addWidget(top_card_frame)
 
         # Recently Played Card
         recent_card_frame = QFrame()
-        recent_card_frame.setStyleSheet("""
-            QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(20, 20, 20, 0.85), stop:1 rgba(10, 10, 10, 0.85));
-                border: 1px solid rgba(60, 60, 60, 0.5);
-                border-radius: 12px;
-            }
-        """)
+        recent_card_frame.setStyleSheet(top_card_frame.styleSheet())
         recent_card_frame.setFixedWidth(400)
         recent_card_frame.setFixedHeight(320)
         
@@ -643,54 +551,14 @@ class ModernMusicPlayer(QWidget):
         recent_card_layout.addWidget(recent_header)
         
         self.history_list = QListWidget()
-        self.history_list.setStyleSheet("""
-            QListWidget {
-                background-color: transparent;
-                border: none;
-                font-size: 13px;
-            }
-            QListWidget::item {
-                color: #dddddd;
-                padding: 10px;
-                border-radius: 6px;
-                margin: 2px 0;
-            }
-            QListWidget::item:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #D94F00, stop:1 #E56A00);
-                color: #000000;
-            }
-            QScrollBar:vertical {
-                border: none;
-                background-color: transparent;
-                width: 1px;
-                margin: 0;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #D3D3D3;
-                border-radius: 0.5px;
-                min-height: 10px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: rgba(211, 211, 211, 0.8);
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0;
-                background: none;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
+        self.history_list.setStyleSheet(self.top_played_list.styleSheet())
         recent_card_layout.addWidget(self.history_list)
         stats_section.addWidget(recent_card_frame)
 
         content_area.addLayout(stats_section)
         center_layout.addLayout(content_area)
 
-        center_layout.addStretch()
-
-        # Bottom Player Bar
+        # Bottom player bar
         player_bar = QFrame()
         player_bar.setFixedHeight(140)
         player_bar.setStyleSheet("""
@@ -704,7 +572,7 @@ class ModernMusicPlayer(QWidget):
         player_layout.setContentsMargins(40, 15, 40, 15)
         player_layout.setSpacing(10)
 
-        # Progress Bar with Time
+        # Progress row
         progress_layout = QHBoxLayout()
         self.current_time_label = QLabel("0:00")
         self.current_time_label.setStyleSheet("color: #999999; font-size: 12px; min-width: 40px;")
@@ -796,10 +664,6 @@ class ModernMusicPlayer(QWidget):
             }
             QPushButton:hover {
                 background-color: #e0e0e0;
-                color: #000000;
-            }
-            QPushButton:pressed {
-                background-color: #cccccc;
                 color: #000000;
             }
         """)
@@ -908,7 +772,7 @@ class ModernMusicPlayer(QWidget):
                     self.list_widget.addItem(cur.title)
                 cur = cur.next
 
-    # ----------------- Cover Art -----------------
+    # ----------------- Cover Art (DEFAULT ONLY) -----------------
     def load_default_cover(self):
         try:
             pix = QPixmap()
@@ -929,41 +793,13 @@ class ModernMusicPlayer(QWidget):
             self.cover_label.setPixmap(pix)
 
     def try_set_cover(self, path):
-        try:
-            from mutagen import File as MutagenFile
-            # First check if the cover is cached
-            cover_cache_path = os.path.join(COVER_CACHE_DIR, f"{hashlib.md5(path.encode()).hexdigest()}.png")
-            if path in self.cover_cache and os.path.exists(cover_cache_path):
-                pix = QPixmap()
-                pix.load(cover_cache_path)
-                pix = pix.scaled(630, 730, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                self.cover_label.setPixmap(pix)
-                return True
-
-            # Check if file has ID3 tags
-            audio = MutagenFile(path)
-            if audio is None or 'ID3' not in audio.tags:
-                return False  # No ID3 tags, silently fall back to default cover
-
-            # Load ID3 tags and extract APIC frame
-            from mutagen.id3 import ID3
-            tags = ID3(path)
-            apics = tags.getall('APIC')
-            if apics:
-                data = apics[0].data
-                pix = QPixmap()
-                pix.loadFromData(data)
-                pix = pix.scaled(630, 730, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                self.cover_label.setPixmap(pix)
-                # Cache the cover art
-                with open(cover_cache_path, 'wb') as f:
-                    f.write(data)
-                self.cover_cache[path] = cover_cache_path
-                return True
-        except Exception as e:
-            if "doesn't start with an ID3 tag" not in str(e):
-                print(f"Error loading embedded cover for {path}: {e}")
-        return False
+        """
+        Simplified behavior per your request:
+        - ALWAYS use the default cover.
+        - Do not attempt to read embedded APIC frames from each song (avoids NoneType errors).
+        """
+        self.load_default_cover()
+        return True
 
     # ----------------- Playback -----------------
     def play_selected(self):
@@ -1006,24 +842,23 @@ class ModernMusicPlayer(QWidget):
         self.heap.add_play(node.title)
         save_play_counts(self.heap)
         save_recent_history(self.history)
-        if not self.try_set_cover(node.path):
-            self.load_default_cover()
+        # Always load default cover (no per-song reading)
+        self.load_default_cover()
+        # Try to read duration (mutagen) but don't crash if unavailable
         try:
             from mutagen import File as MutagenFile
             mf = MutagenFile(node.path)
             dur = int(getattr(mf.info, 'length', 0))
             self.song_duration = dur
-        except:
-            dur = 0
+        except Exception:
             self.song_duration = 0
-        self.progress_slider.setMaximum(max(dur, 1))
+        self.progress_slider.setMaximum(max(self.song_duration, 1))
         self.progress_slider.setValue(0)
-        self.total_time_label.setText(self.format_time(dur))
+        self.total_time_label.setText(self.format_time(self.song_duration))
         self.current_time_label.setText("0:00")
         self.update_top_played_ui()
         self.update_recently_played_ui()
         self.update_upcoming_ui()
-        self.update_interface_for_current_song()
 
     def toggle_play_pause(self):
         if self.playing:
@@ -1079,6 +914,7 @@ class ModernMusicPlayer(QWidget):
                 else:
                     self.next_song()
         except Exception as e:
+            # Keep errors visible in console but avoid crashing UI
             print(f"Error in update_progress: {e}")
 
     # ----------------- Top & Recent -----------------
@@ -1113,11 +949,6 @@ class ModernMusicPlayer(QWidget):
         self.upcoming.enqueue(title)
         self.update_upcoming_ui()
 
-    def update_interface_for_current_song(self):
-        if self.current_node:
-            if not self.try_set_cover(self.current_node.path):
-                self.load_default_cover()
-
     def play_next_from_upcoming(self):
         self.slider_being_dragged = False
         title = self.upcoming.dequeue()
@@ -1127,7 +958,6 @@ class ModernMusicPlayer(QWidget):
         node = self.song_map.search_song(title)
         if node:
             self.play_node(node)
-            self.update_interface_for_current_song()
         self.update_upcoming_ui()
 
     # ----------------- Time Formatting -----------------
@@ -1167,6 +997,13 @@ class ModernMusicPlayer(QWidget):
 
 # ----------------- Run -----------------
 if __name__ == "__main__":
+    # initialize pygame mixer (safe to call even if not used immediately)
+    try:
+        pygame.mixer.init()
+    except Exception:
+        # If pygame fails to initialize, player.play/is_playing behavior may be affected.
+        print("Warning: pygame mixer failed to initialize; audio playback may not work.")
+
     app = QApplication(sys.argv)
     gui = ModernMusicPlayer()
     gui.show()
