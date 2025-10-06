@@ -173,6 +173,7 @@ class ModernMusicPlayer(QWidget):
         self.autoplay_enabled = True
         self.song_duration = 0
         self.play_start_offset = 0
+        self.previous_volume = 80  # Store previous volume for mute/unmute
 
         # Cache for UI optimizations
         self.last_top_played = []
@@ -317,7 +318,7 @@ class ModernMusicPlayer(QWidget):
             }
             QListWidget::item:selected {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #D94F00, stop:1 #E56A00);
+                    stop:0 #B03C00, stop:1 #C74300);
                 color: #000000;
                 font-weight: 600;
             }
@@ -632,8 +633,8 @@ class ModernMusicPlayer(QWidget):
                 font-size: 18px;
                 padding: 10px;
                 border-radius: 25px;
-                min-width: 50px;
-                min-height: 50px;
+                min-width: 40px;
+                min-height: 40px;
             }
             QPushButton:hover {
                 background-color: transparent;
@@ -679,45 +680,61 @@ class ModernMusicPlayer(QWidget):
 
         # Volume Control
         volume_frame = QFrame()
-        volume_frame.setFixedWidth(300)
+        volume_frame.setFixedWidth(350)
         vol_layout = QHBoxLayout(volume_frame)
         vol_layout.setContentsMargins(0, 0, 0, 0)
         vol_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        vol_layout.setSpacing(10)
 
-        vol_icon = QLabel("🔊")
-        vol_icon.setStyleSheet("font-size: 18px;")
-        vol_layout.addWidget(vol_icon)
-        
+        self.mute_btn = QPushButton("🔊")
+        self.mute_btn.setStyleSheet(btn_style)
+        self.mute_btn.clicked.connect(self.toggle_mute)
+        vol_layout.addWidget(self.mute_btn)
+
+        self.vol_down_btn = QPushButton("−")
+        self.vol_down_btn.setStyleSheet(btn_style)
+        self.vol_down_btn.clicked.connect(self.volume_down)
+        vol_layout.addWidget(self.vol_down_btn)
+
         self.vol_slider = QSlider(Qt.Orientation.Horizontal)
-        self.vol_slider.setFixedWidth(200)
+        self.vol_slider.setFixedWidth(150)
         self.vol_slider.setValue(80)
         self.vol_slider.setStyleSheet("""
             QSlider::groove:horizontal {
-                background: transparent;
+                background: rgba(60, 60, 60, 0.7);
                 height: 5px;
                 border-radius: 2px;
             }
             QSlider::sub-page:horizontal {
-                background: #D94F00;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D94F00, stop:1 #E56A00);
                 border-radius: 2px;
             }
             QSlider::handle:horizontal {
-                background: transparent;
+                background: white;
                 border: 1px solid #D94F00;
                 width: 12px;
                 height: 12px;
                 border-radius: 6px;
                 margin: -4px 0;
             }
+            QSlider::handle:horizontal:hover {
+                background: #D94F00;
+            }
         """)
         self.vol_slider.valueChanged.connect(self.set_volume)
         vol_layout.addWidget(self.vol_slider)
-        
+
+        self.vol_up_btn = QPushButton("+")
+        self.vol_up_btn.setStyleSheet(btn_style)
+        self.vol_up_btn.clicked.connect(self.volume_up)
+        vol_layout.addWidget(self.vol_up_btn)
+
         self.vol_percentage_label = QLabel("80%")
         self.vol_percentage_label.setStyleSheet("color: #999999; font-size: 12px; min-width: 35px;")
         vol_layout.addWidget(self.vol_percentage_label)
         
-        controls_row.addWidget(volume_frame)
+        controls_row.addLayout(vol_layout)
         player_layout.addLayout(controls_row)
 
         center_layout.addWidget(player_bar)
@@ -859,6 +876,13 @@ class ModernMusicPlayer(QWidget):
         self.update_top_played_ui()
         self.update_recently_played_ui()
         self.update_upcoming_ui()
+        # Highlight the current song in the playlist
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if item.text() == node.title:
+                self.list_widget.setCurrentItem(item)
+                self.list_widget.scrollToItem(item, QListWidget.ScrollHint.PositionAtCenter)
+                break
 
     def toggle_play_pause(self):
         if self.playing:
@@ -890,6 +914,26 @@ class ModernMusicPlayer(QWidget):
     def set_volume(self, val):
         self.player.set_volume(val / 100)
         self.vol_percentage_label.setText(f"{val}%")
+        self.previous_volume = val if val > 0 else self.previous_volume
+        self.mute_btn.setText("🔇" if val == 0 else "🔊")
+
+    def toggle_mute(self):
+        current_volume = self.vol_slider.value()
+        if current_volume == 0:
+            self.vol_slider.setValue(self.previous_volume)
+        else:
+            self.previous_volume = current_volume
+            self.vol_slider.setValue(0)
+
+    def volume_up(self):
+        current_volume = self.vol_slider.value()
+        new_volume = min(current_volume + 5, 100)
+        self.vol_slider.setValue(new_volume)
+
+    def volume_down(self):
+        current_volume = self.vol_slider.value()
+        new_volume = max(current_volume - 5, 0)
+        self.vol_slider.setValue(new_volume)
 
     # ----------------- Progress -----------------
     def update_progress(self):
