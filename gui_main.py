@@ -87,6 +87,8 @@ class ModernMusicPlayer(QWidget):
         self.playing = False
         self.upcoming = UpcomingSongs()
         self.slider_being_dragged = False
+        self.autoplay = False
+        self.offset = 0  # Track seek offset
 
         # Load data
         load_play_counts(self.heap)
@@ -229,17 +231,24 @@ class ModernMusicPlayer(QWidget):
             }
             QScrollBar:vertical {
                 border: none;
-                background-color: rgba(10, 10, 10, 0.8);
-                width: 8px;
-                border-radius: 4px;
+                background-color: transparent;
+                width: 2px;
+                margin: 0;
             }
             QScrollBar::handle:vertical {
-                background-color: rgba(80, 80, 80, 0.7);
-                border-radius: 4px;
+                background-color: #FFFFFF;
+                border-radius: 1px;
                 min-height: 20px;
             }
             QScrollBar::handle:vertical:hover {
-                background-color: #D94F00;
+                background-color: rgba(255, 255, 255, 0.8);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
             }
         """)
         side_layout.addWidget(self.list_widget, stretch=3)
@@ -305,6 +314,27 @@ class ModernMusicPlayer(QWidget):
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #D94F00, stop:1 #E56A00);
                 color: #000000;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background-color: transparent;
+                width: 2px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #FFFFFF;
+                border-radius: 1px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: rgba(255, 255, 255, 0.8);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
             }
         """)
         side_layout.addWidget(self.upcoming_list, stretch=1)
@@ -439,6 +469,27 @@ class ModernMusicPlayer(QWidget):
                     stop:0 #D94F00, stop:1 #E56A00);
                 color: #000000;
             }
+            QScrollBar:vertical {
+                border: none;
+                background-color: transparent;
+                width: 2px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #FFFFFF;
+                border-radius: 1px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: rgba(255, 255, 255, 0.8);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
         """)
         top_card_layout.addWidget(self.top_played_list)
         stats_section.addWidget(top_card_frame)
@@ -486,6 +537,27 @@ class ModernMusicPlayer(QWidget):
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #D94F00, stop:1 #E56A00);
                 color: #000000;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background-color: transparent;
+                width: 2px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #FFFFFF;
+                border-radius: 1px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: rgba(255, 255, 255, 0.8);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
             }
         """)
         recent_card_layout.addWidget(self.history_list)
@@ -540,7 +612,7 @@ class ModernMusicPlayer(QWidget):
             }
         """)
         self.progress_slider.sliderPressed.connect(lambda: setattr(self, 'slider_being_dragged', True))
-        self.progress_slider.sliderReleased.connect(lambda: setattr(self, 'slider_being_dragged', False))
+        self.progress_slider.sliderReleased.connect(self.seek_to_position)
         progress_layout.addWidget(self.progress_slider)
 
         self.total_time_label = QLabel("0:00")
@@ -556,7 +628,7 @@ class ModernMusicPlayer(QWidget):
 
         # Playback Controls
         playback_frame = QFrame()
-        playback_frame.setFixedWidth(200)
+        playback_frame.setFixedWidth(350)
         playback_layout = QHBoxLayout(playback_frame)
         playback_layout.setSpacing(15)
         playback_layout.setContentsMargins(0, 0, 0, 0)
@@ -617,6 +689,35 @@ class ModernMusicPlayer(QWidget):
         self.next_btn.clicked.connect(self.next_song)
         playback_layout.addWidget(self.next_btn)
 
+        self.autoplay_btn = QPushButton("↻")
+        self.autoplay_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #dddddd;
+                border: none;
+                font-size: 18px;
+                padding: 10px;
+                border-radius: 25px;
+                min-width: 50px;
+                min-height: 50px;
+            }
+            QPushButton:checked {
+                background-color: transparent;
+                color: #D94F00;
+            }
+            QPushButton:hover {
+                background-color: transparent;
+                color: #D94F00;
+            }
+            QPushButton:pressed {
+                background-color: transparent;
+                color: #C74300;
+            }
+        """)
+        self.autoplay_btn.setCheckable(True)
+        self.autoplay_btn.clicked.connect(self.toggle_autoplay)
+        playback_layout.addWidget(self.autoplay_btn)
+
         controls_row.addWidget(playback_frame)
 
         # Volume Control
@@ -674,6 +775,11 @@ class ModernMusicPlayer(QWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_progress)
         self.timer.start(100)
+
+    # ----------------- Autoplay Functionality -----------------
+    def toggle_autoplay(self):
+        self.autoplay = self.autoplay_btn.isChecked()
+        # No need to change style here since it's set in the stylesheet with :checked and :hover
 
     # ----------------- Load Songs -----------------
     def load_songs(self):
@@ -786,6 +892,7 @@ class ModernMusicPlayer(QWidget):
         save_recent_history(self.history)
         self.playing = True
         self.play_pause_btn.setText("||")
+        self.offset = 0  # Reset offset
         if not self.try_set_cover(node.path):
             pass
         # Duration
@@ -813,30 +920,86 @@ class ModernMusicPlayer(QWidget):
             else:
                 self.play_selected()
 
-    def next_song(self):
-        if self.current_node and self.current_node.next:
-            self.play_node(self.current_node.next)
-
     def prev_song(self):
-        if self.current_node and self.current_node.prev:
-            self.play_node(self.current_node.prev)
+        if self.current_node:
+            if self.current_node.prev:
+                self.play_node(self.current_node.prev)
+            elif self.autoplay:
+                cur = self.playlist.head
+                while cur and cur.next:
+                    cur = cur.next
+                if cur:
+                    self.play_node(cur)
+            else:
+                self.song_label.setText("No previous song available")
+                QTimer.singleShot(2000, lambda: self.song_label.setText(f"🎵 {self.current_node.title}" if self.current_node else "No song playing"))
+        else:
+            self.song_label.setText("No previous song available")
+            QTimer.singleShot(2000, lambda: self.song_label.setText("No song playing"))
+
+    def next_song(self):
+        if self.upcoming.size > 0:
+            self.play_next_from_upcoming()
+        elif self.current_node:
+            if self.current_node.next:
+                self.play_node(self.current_node.next)
+            elif self.autoplay:
+                if self.playlist.head:
+                    self.play_node(self.playlist.head)
+                else:
+                    self.song_label.setText("No next song available")
+                    QTimer.singleShot(2000, lambda: self.song_label.setText(f"🎵 {self.current_node.title}" if self.current_node else "No song playing"))
+            else:
+                self.song_label.setText("No next song available")
+                QTimer.singleShot(2000, lambda: self.song_label.setText(f"🎵 {self.current_node.title}" if self.current_node else "No song playing"))
+        else:
+            self.song_label.setText("No next song available")
+            QTimer.singleShot(2000, lambda: self.song_label.setText("No song playing"))
 
     def set_volume(self, val):
         self.player.set_volume(val / 100)
         self.vol_percentage_label.setText(f"{val}%")
+
+    # ----------------- Seeking Functionality -----------------
+    def seek_to_position(self):
+        if not self.current_node:
+            return
+        seconds = self.progress_slider.value()
+        try:
+            import pygame
+            pygame.mixer.music.stop()
+            pygame.mixer.music.load(self.current_node.path)
+            pygame.mixer.music.play(start=seconds)
+            self.offset = seconds
+            self.playing = True
+            self.play_pause_btn.setText("||")
+            self.slider_being_dragged = False
+        except Exception as e:
+            print(f"Seeking failed: {e}. Restarting from beginning.")
+            self.play_node(self.current_node)  # Fallback
+            self.slider_being_dragged = False
 
     # ----------------- Progress -----------------
     def update_progress(self):
         if self.playing and self.player.is_playing() and not self.slider_being_dragged:
             try:
                 import pygame
-                pos = pygame.mixer.music.get_pos() / 1000
-                self.progress_slider.setValue(int(pos))
-                self.current_time_label.setText(f"{int(pos//60)}:{int(pos%60):02d}")
+                mixer_pos = pygame.mixer.music.get_pos() / 1000
+                real_pos = self.offset + mixer_pos
+                self.progress_slider.setValue(int(real_pos))
+                self.current_time_label.setText(f"{int(real_pos//60)}:{int(real_pos%60):02d}")
                 if not pygame.mixer.music.get_busy() and self.playing:
                     self.playing = False
                     self.play_pause_btn.setText("|> ")
-                    self.next_song()
+                    if self.autoplay:
+                        # PRIORITY: Play next from queue (ADD TO QUEUE section) first
+                        if self.upcoming.size > 0:
+                            self.play_next_from_upcoming()
+                        elif self.current_node and self.current_node.next:
+                            self.play_node(self.current_node.next)
+                        elif self.current_node and self.autoplay:  # Wrap to first song
+                            if self.playlist.head:
+                                self.play_node(self.playlist.head)
             except KeyboardInterrupt:
                 print("Program interrupted by user")
                 self.player.stop()
