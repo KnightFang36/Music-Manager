@@ -2,9 +2,9 @@ import sys, os, json
 from urllib.request import urlopen
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel,
-    QPushButton, QSlider, QCheckBox, QLineEdit, QFrame, QListWidgetItem
+    QPushButton, QSlider, QCheckBox, QLineEdit, QFrame, QListWidgetItem, QStyle
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QPixmap, QColor
 from playlist_dll import Playlist
 from hashmap import SongMap
@@ -12,6 +12,7 @@ from heap_bst import SongHeap
 from bst import BST
 from stack_queue import RecentlyPlayed, UpcomingSongs
 from player import MusicPlayer
+import pygame
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -61,6 +62,43 @@ def save_recent_history(history: RecentlyPlayed):
     except Exception as e:
         print('Could not save recently played history:', e)
 
+# ----------------- Clickable Slider Class -----------------
+class ClickableSlider(QSlider):
+    positionChanged = pyqtSignal(int)
+    def __init__(self, orientation):
+        super().__init__(orientation)
+        self.user_is_setting = False
+        self.valueChanged.connect(self._on_value_changed)
+    def _on_value_changed(self, value):
+        if self.user_is_setting:
+            self.positionChanged.emit(value)
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.user_is_setting = True
+            value = QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), int(event.position().x()), self.width())
+            self.setValue(value)
+            self.positionChanged.emit(value)
+            super().mousePressEvent(event)
+        else:
+            super().mousePressEvent(event)
+    def mouseMoveEvent(self, event):
+        if self.user_is_setting:
+            value = QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), int(event.position().x()), self.width())
+            self.setValue(value)
+            self.positionChanged.emit(value)
+        super().mouseMoveEvent(event)
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.user_is_setting = False
+        super().mouseReleaseEvent(event)
+    def set_position(self, pos, emit=False):
+        if not self.user_is_setting:
+            self.blockSignals(True)
+            self.setValue(pos)
+            self.blockSignals(False)
+            if emit:
+                self.positionChanged.emit(pos)
+
 # ----------------- Main GUI Class -----------------
 class ModernMusicPlayer(QWidget):
     def __init__(self):
@@ -87,6 +125,11 @@ class ModernMusicPlayer(QWidget):
         self.playing = False
         self.upcoming = UpcomingSongs()
         self.slider_being_dragged = False
+
+        # Playback position tracking
+        self.play_start_offset = 0.0
+        self.current_position = 0
+        self.is_seeking = False
 
         # Load data
         load_play_counts(self.heap)
@@ -516,7 +559,7 @@ class ModernMusicPlayer(QWidget):
         self.current_time_label.setStyleSheet("color: #999999; font-size: 12px; min-width: 40px;")
         progress_layout.addWidget(self.current_time_label)
 
-        self.progress_slider = QSlider(Qt.Orientation.Horizontal)
+        self.progress_slider = ClickableSlider(Qt.Orientation.Horizontal)
         self.progress_slider.setStyleSheet("""
             QSlider::groove:horizontal {
                 background: rgba(60, 60, 60, 0.7);
@@ -539,8 +582,9 @@ class ModernMusicPlayer(QWidget):
                 background: #D94F00;
             }
         """)
-        self.progress_slider.sliderPressed.connect(lambda: setattr(self, 'slider_being_dragged', True))
-        self.progress_slider.sliderReleased.connect(lambda: setattr(self, 'slider_being_dragged', False))
+        self.progress_slider.sliderPressed.connect(self.slider_pressed)
+        self.progress_slider.sliderReleased.connect(self.slider_released)
+        self.progress_slider.positionChanged.connect(self.slider_position_changed)
         progress_layout.addWidget(self.progress_slider)
 
         self.total_time_label = QLabel("0:00")
@@ -794,7 +838,8 @@ class ModernMusicPlayer(QWidget):
             mf = MutagenFile(node.path)
             dur = getattr(mf.info, 'length', 0)
             self.progress_slider.setMaximum(int(dur))
-            self.total_time_label.setText(f"{int(dur//60)}:{int(dur%60):02d}")
+            # self.total_time_label.setText(f"{int(dur//60)}:{int(dur%60):02d}")
+            self.total_time_label.setText(self.format_time(dur))
         except:
             self.progress_slider.setMaximum(100)
             self.total_time_label.setText("0:00")
@@ -829,10 +874,12 @@ class ModernMusicPlayer(QWidget):
     def update_progress(self):
         if self.playing and self.player.is_playing() and not self.slider_being_dragged:
             try:
-                import pygame
-                pos = pygame.mixer.music.get_pos() / 1000
-                self.progress_slider.setValue(int(pos))
-                self.current_time_label.setText(f"{int(pos//60)}:{int(pos%60):02d}")
+                rel = pygame.mixer.music.get_pos() / 1000.0
+                if rel >= 0:
+                    abs_pos = self.play_start_offset + rel
+                    self.current_position = abs_pos
+                    self.progress_slider.set_position(int(abs_pos))
+                    self.current_time_label.setText(self.format_time(abs_pos))
                 if not pygame.mixer.music.get_busy() and self.playing:
                     self.playing = False
                     self.play_pause_btn.setText("|> ")
@@ -879,6 +926,46 @@ class ModernMusicPlayer(QWidget):
         if node:
             self.play_node(node)
         self.update_upcoming_ui()
+
+    # ----------------- Time Formatting -----------------
+    def format_time(self, seconds: float) -> str:
+        m = int(seconds // 60)
+        s = int(seconds % 60)
+        return f"{m}:{s:02d}"
+
+    # ----------------- Slider Handlers -----------------
+    def slider_position_changed(self, position: int):
+        self.current_time_label.setText(self.format_time(position))
+        self.current_position = position
+        if self.current_node and self.slider_being_dragged and self.playing:
+            self.seek_to(position)
+
+    def slider_pressed(self):
+        self.slider_being_dragged = True
+        self.is_seeking = True
+
+    def slider_released(self):
+        self.slider_being_dragged = False
+        new_pos = self.progress_slider.value()
+        self.current_position = new_pos
+        self.current_time_label.setText(self.format_time(new_pos))
+        if self.current_node:
+            if self.playing:
+                self.seek_to(new_pos)
+            else:
+                self.play_start_offset = float(new_pos)
+                self.progress_slider.set_position(new_pos, emit=True)
+
+    def seek_to(self, position: float):
+        try:
+            self.play_start_offset = float(position)
+            pygame.mixer.music.stop()
+            pygame.mixer.music.load(self.current_node.path)
+            pygame.mixer.music.play(start=position)
+            self.progress_slider.set_position(int(position))
+            self.current_time_label.setText(self.format_time(position))
+        except Exception as e:
+            print(f"Seek error: {e}")
 
 # ----------------- Run -----------------
 if __name__ == "__main__":
