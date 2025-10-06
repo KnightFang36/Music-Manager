@@ -13,18 +13,37 @@ from bst import BST
 from stack_queue import RecentlyPlayed, UpcomingSongs
 from player import MusicPlayer
 import pygame
+import time
+import hashlib
+
+# Suppress all Qt warnings, including qt.gui.imageio
+os.environ["QT_LOGGING_RULES"] = "qt*=false"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 SONG_DIR = os.path.join(BASE_DIR, "songs")
 PLAY_COUNTS = os.path.join(DATA_DIR, 'play_counts.json')
 RECENT_HISTORY = os.path.join(DATA_DIR, 'recently_played.json')
-DEFAULT_COVER_URL = "https://cbx-prod.b-cdn.net/COLOURBOX20357576.jpg?width=480&height=480&quality=70"
+DEFAULT_COVER_URL = "https://i.redd.it/wo1p6792qi371.png"
+DEFAULT_COVER_PATH = os.path.join(DATA_DIR, 'default_cover.png')
+COVER_CACHE_DIR = os.path.join(DATA_DIR, 'cover_cache')
 
 # ----------------- Utility Functions -----------------
 def ensure_dirs():
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(SONG_DIR, exist_ok=True)
+    os.makedirs(COVER_CACHE_DIR, exist_ok=True)
+
+def cache_default_cover():
+    """Cache the default cover image locally to avoid repeated network requests."""
+    if not os.path.exists(DEFAULT_COVER_PATH):
+        try:
+            with urlopen(DEFAULT_COVER_URL) as response:
+                data = response.read()
+            with open(DEFAULT_COVER_PATH, 'wb') as f:
+                f.write(data)
+        except Exception as e:
+            print(f"Failed to cache default cover: {e}")
 
 def load_play_counts(heap: SongHeap):
     if os.path.exists(PLAY_COUNTS):
@@ -37,13 +56,19 @@ def load_play_counts(heap: SongHeap):
         except Exception as e:
             print('Could not load play counts:', e)
 
-def save_play_counts(heap: SongHeap):
+def save_play_counts(heap: SongHeap, force=False):
+    """Save play counts with debouncing to reduce I/O frequency."""
+    if hasattr(save_play_counts, 'last_save') and not force:
+        if time.time() - save_play_counts.last_save < 5:  # Debounce for 5 seconds
+            return
     try:
         ensure_dirs()
         with open(PLAY_COUNTS, 'w', encoding='utf-8') as f:
             json.dump(heap.counter, f, indent=2)
+        save_play_counts.last_save = time.time()
     except Exception as e:
         print('Could not save play counts:', e)
+save_play_counts.last_save = 0
 
 def load_recent_history(history: RecentlyPlayed):
     if os.path.exists(RECENT_HISTORY):
@@ -54,13 +79,19 @@ def load_recent_history(history: RecentlyPlayed):
         except Exception as e:
             print('Could not load recently played history:', e)
 
-def save_recent_history(history: RecentlyPlayed):
+def save_recent_history(history: RecentlyPlayed, force=False):
+    """Save recent history with debouncing to reduce I/O frequency."""
+    if hasattr(save_recent_history, 'last_save') and not force:
+        if time.time() - save_recent_history.last_save < 5:  # Debounce for 5 seconds
+            return
     try:
         ensure_dirs()
         with open(RECENT_HISTORY, 'w', encoding='utf-8') as f:
             json.dump({'history': history.stack}, f, indent=2)
+        save_recent_history.last_save = time.time()
     except Exception as e:
         print('Could not save recently played history:', e)
+save_recent_history.last_save = 0
 
 # ----------------- Simplified Slider Class -----------------
 class ClickableSlider(QSlider):
@@ -77,16 +108,13 @@ class ClickableSlider(QSlider):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            # If drag is not enabled, treat single-click as jump-to-position
             if not self.drag_enabled:
                 self.user_is_setting = True
                 value = QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), int(event.position().x()), self.width())
                 self.setValue(value)
                 self.positionChanged.emit(value)
-                # Don't call super to avoid entering drag mode on single click
                 return
             else:
-                # Drag mode enabled: allow normal behavior
                 self.user_is_setting = True
         super().mousePressEvent(event)
 
@@ -95,31 +123,25 @@ class ClickableSlider(QSlider):
             value = QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), int(event.position().x()), self.width())
             self.setValue(value)
             self.positionChanged.emit(value)
-            # Also allow default dragging behavior
             super().mouseMoveEvent(event)
         else:
-            # Ignore move when not in drag mode
             event.ignore()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.user_is_setting = False
-            # Exiting drag mode when releasing the handle
             if self.drag_enabled:
                 self.drag_enabled = False
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            # Determine if the double-click is near the handle
             handle_x = QStyle.sliderPositionFromValue(self.minimum(), self.maximum(), self.value(), self.width())
             click_x = int(event.position().x())
             if abs(click_x - handle_x) <= 12:
-                # Near the handle: enable drag mode
                 self.drag_enabled = True
                 super().mouseDoubleClickEvent(event)
             else:
-                # Away from handle: treat as jump-to-position
                 value = QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), click_x, self.width())
                 self.setValue(value)
                 self.positionChanged.emit(value)
@@ -131,14 +153,12 @@ class ModernMusicPlayer(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Music Player")
-        self.setGeometry(100, 100, 1600, 900)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #0A0A0A;
-                color: #ffffff;
-                font-family: 'Segoe UI', 'San Francisco', 'Arial';
-            }
-        """)
+        
+        # Set minimum size based on screen geometry
+        screen = QApplication.primaryScreen().availableGeometry()
+        min_width = min(1550, screen.width() - 20)
+        min_height = min(1096, screen.height() - 50)
+        self.setMinimumSize(min_width, min_height)
         self.showMaximized()
 
         # Core modules
@@ -155,15 +175,21 @@ class ModernMusicPlayer(QWidget):
         self.current_position = 0
         self.autoplay_enabled = True
         self.song_duration = 0
-        # Offset within the track when (re)starting playback, so UI shows absolute position
         self.play_start_offset = 0
 
-        # Timer for UI sync (50ms)
+        # Cache for UI optimizations
+        self.last_top_played = []
+        self.last_recently_played = []
+        self.last_upcoming = []
+        self.cover_cache = {}  # Cache for embedded cover art paths
+
+        # Timer for UI sync (200ms for reduced frequency)
         self.progress_timer = QTimer(self)
         self.progress_timer.timeout.connect(self.update_progress)
-        self.progress_timer.start(50)
+        self.progress_timer.start(200)
 
         # Load data
+        cache_default_cover()
         load_play_counts(self.heap)
         load_recent_history(self.history)
 
@@ -180,7 +206,7 @@ class ModernMusicPlayer(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # ----------------- Left Sidebar -----------------
+        # Left Sidebar
         sidebar = QFrame()
         sidebar.setFixedWidth(320)
         sidebar.setStyleSheet("""
@@ -275,7 +301,7 @@ class ModernMusicPlayer(QWidget):
         self.search_input.textChanged.connect(self.update_playlist_display)
         side_layout.addWidget(self.search_input)
 
-        # Playlist List (Larger)
+        # Playlist List
         self.list_widget = QListWidget()
         self.list_widget.setStyleSheet("""
             QListWidget {
@@ -304,17 +330,24 @@ class ModernMusicPlayer(QWidget):
             }
             QScrollBar:vertical {
                 border: none;
-                background-color: rgba(10, 10, 10, 0.8);
-                width: 8px;
-                border-radius: 4px;
+                background-color: transparent;
+                width: 1px;
+                margin: 0;
             }
             QScrollBar::handle:vertical {
-                background-color: rgba(80, 80, 80, 0.7);
-                border-radius: 4px;
-                min-height: 20px;
+                background-color: #D3D3D3;
+                border-radius: 0.5px;
+                min-height: 10px;
             }
             QScrollBar::handle:vertical:hover {
-                background-color: #D94F00;
+                background-color: rgba(211, 211, 211, 0.8);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
             }
         """)
         side_layout.addWidget(self.list_widget, stretch=3)
@@ -351,7 +384,7 @@ class ModernMusicPlayer(QWidget):
         divider2.setStyleSheet("background-color: rgba(60, 60, 60, 0.5); max-height: 1px; margin: 10px 0;")
         side_layout.addWidget(divider2)
 
-        # Upcoming Queue (Smaller)
+        # Upcoming Queue
         up_label = QLabel("UP NEXT")
         up_label.setStyleSheet("""
             font-size: 13px;
@@ -380,6 +413,27 @@ class ModernMusicPlayer(QWidget):
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #D94F00, stop:1 #E56A00);
                 color: #000000;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background-color: transparent;
+                width: 1px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #D3D3D3;
+                border-radius: 0.5px;
+                min-height: 10px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: rgba(211, 211, 211, 0.8);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
             }
         """)
         side_layout.addWidget(self.upcoming_list, stretch=1)
@@ -430,12 +484,12 @@ class ModernMusicPlayer(QWidget):
                 border: 2px solid #D94F00;
             }
         """)
-        self.autoplay_checkbox.setChecked(True)  # Default to enabled
+        self.autoplay_checkbox.setChecked(True)
         side_layout.addWidget(self.autoplay_checkbox)
 
         main_layout.addWidget(sidebar)
 
-        # ----------------- Center Content -----------------
+        # Center Content
         center_container = QFrame()
         center_container.setStyleSheet("background-color: #0A0A0A;")
         center_layout = QVBoxLayout(center_container)
@@ -446,14 +500,13 @@ class ModernMusicPlayer(QWidget):
         content_area = QHBoxLayout()
         content_area.setSpacing(60)
 
-        # Left: Album Cover Section
+        # Album Cover Section
         album_section = QVBoxLayout()
         album_section.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        album_section.setSpacing(30)
+        album_section.setSpacing(50)
 
-        # Album Cover
         cover_container = QFrame()
-        cover_container.setFixedSize(420, 420)
+        cover_container.setFixedSize(650, 750)
         cover_container.setStyleSheet("""
             QFrame {
                 background-color: rgba(10, 10, 10, 0.8);
@@ -464,7 +517,7 @@ class ModernMusicPlayer(QWidget):
         cover_layout.setContentsMargins(10, 10, 10, 10)
         
         self.cover_label = QLabel()
-        self.cover_label.setFixedSize(400, 400)
+        self.cover_label.setFixedSize(630, 730)
         self.cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cover_label.setStyleSheet("""
             border-radius: 8px;
@@ -477,7 +530,7 @@ class ModernMusicPlayer(QWidget):
 
         # Song Info
         self.song_label = QLabel("No song playing")
-        self.song_label.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
+        self.song_label.setFont(QFont("Segoe UI", 20, QFont.Weight.Normal))
         self.song_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.song_label.setStyleSheet("""
             color: #ffffff;
@@ -489,7 +542,7 @@ class ModernMusicPlayer(QWidget):
 
         content_area.addLayout(album_section)
 
-        # Right: Stats Section
+        # Stats Section
         stats_section = QVBoxLayout()
         stats_section.setAlignment(Qt.AlignmentFlag.AlignTop)
         stats_section.setSpacing(25)
@@ -537,6 +590,27 @@ class ModernMusicPlayer(QWidget):
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #D94F00, stop:1 #E56A00);
                 color: #000000;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background-color: transparent;
+                width: 1px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #D3D3D3;
+                border-radius: 0.5px;
+                min-height: 10px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: rgba(211, 211, 211, 0.8);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
             }
         """)
         top_card_layout.addWidget(self.top_played_list)
@@ -586,6 +660,27 @@ class ModernMusicPlayer(QWidget):
                     stop:0 #D94F00, stop:1 #E56A00);
                 color: #000000;
             }
+            QScrollBar:vertical {
+                border: none;
+                background-color: transparent;
+                width: 1px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #D3D3D3;
+                border-radius: 0.5px;
+                min-height: 10px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: rgba(211, 211, 211, 0.8);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
         """)
         recent_card_layout.addWidget(self.history_list)
         stats_section.addWidget(recent_card_frame)
@@ -595,7 +690,7 @@ class ModernMusicPlayer(QWidget):
 
         center_layout.addStretch()
 
-        # ----------------- Bottom Player Bar -----------------
+        # Bottom Player Bar
         player_bar = QFrame()
         player_bar.setFixedHeight(140)
         player_bar.setStyleSheet("""
@@ -649,12 +744,11 @@ class ModernMusicPlayer(QWidget):
         progress_layout.addWidget(self.total_time_label)
         player_layout.addLayout(progress_layout)
 
-        # Playback and Volume Controls (Side by Side)
+        # Playback and Volume Controls
         controls_row = QHBoxLayout()
         controls_row.setSpacing(20)
         controls_row.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
-        # Playback Controls
         playback_frame = QFrame()
         playback_frame.setFixedWidth(200)
         playback_layout = QHBoxLayout(playback_frame)
@@ -765,15 +859,11 @@ class ModernMusicPlayer(QWidget):
         center_layout.addWidget(player_bar)
         main_layout.addWidget(center_container)
 
-        # ----------------- Connections -----------------
+        # Connections
         self.list_widget.itemDoubleClicked.connect(self.play_selected)
         self.upcoming_list.itemDoubleClicked.connect(self.enqueue_selected_from_upcoming)
         self.history_list.itemDoubleClicked.connect(self.play_selected_recently_played)
         self.top_played_list.itemDoubleClicked.connect(self.play_selected_top_played)
-
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_progress)
-        self.timer.start(100)
 
     # ----------------- Load Songs -----------------
     def load_songs(self):
@@ -821,19 +911,41 @@ class ModernMusicPlayer(QWidget):
     # ----------------- Cover Art -----------------
     def load_default_cover(self):
         try:
-            with urlopen(DEFAULT_COVER_URL) as response:
-                data = response.read()
             pix = QPixmap()
-            pix.loadFromData(data)
-            pix = pix.scaled(400, 400, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            if os.path.exists(DEFAULT_COVER_PATH):
+                pix.load(DEFAULT_COVER_PATH)
+            else:
+                with urlopen(DEFAULT_COVER_URL) as response:
+                    data = response.read()
+                pix.loadFromData(data)
+                with open(DEFAULT_COVER_PATH, 'wb') as f:
+                    f.write(data)
+            pix = pix.scaled(630, 730, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.cover_label.setPixmap(pix)
-        except:
-            pix = QPixmap(400, 400)
+        except Exception as e:
+            print(f"Error loading default cover: {e}")
+            pix = QPixmap(630, 730)
             pix.fill(QColor("#0A0A0A"))
             self.cover_label.setPixmap(pix)
 
     def try_set_cover(self, path):
         try:
+            from mutagen import File as MutagenFile
+            # First check if the cover is cached
+            cover_cache_path = os.path.join(COVER_CACHE_DIR, f"{hashlib.md5(path.encode()).hexdigest()}.png")
+            if path in self.cover_cache and os.path.exists(cover_cache_path):
+                pix = QPixmap()
+                pix.load(cover_cache_path)
+                pix = pix.scaled(630, 730, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                self.cover_label.setPixmap(pix)
+                return True
+
+            # Check if file has ID3 tags
+            audio = MutagenFile(path)
+            if audio is None or 'ID3' not in audio.tags:
+                return False  # No ID3 tags, silently fall back to default cover
+
+            # Load ID3 tags and extract APIC frame
             from mutagen.id3 import ID3
             tags = ID3(path)
             apics = tags.getall('APIC')
@@ -841,11 +953,16 @@ class ModernMusicPlayer(QWidget):
                 data = apics[0].data
                 pix = QPixmap()
                 pix.loadFromData(data)
-                pix = pix.scaled(400, 400, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                pix = pix.scaled(630, 730, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                 self.cover_label.setPixmap(pix)
+                # Cache the cover art
+                with open(cover_cache_path, 'wb') as f:
+                    f.write(data)
+                self.cover_cache[path] = cover_cache_path
                 return True
-        except:
-            pass
+        except Exception as e:
+            if "doesn't start with an ID3 tag" not in str(e):
+                print(f"Error loading embedded cover for {path}: {e}")
         return False
 
     # ----------------- Playback -----------------
@@ -890,8 +1007,7 @@ class ModernMusicPlayer(QWidget):
         save_play_counts(self.heap)
         save_recent_history(self.history)
         if not self.try_set_cover(node.path):
-            pass
-        # Get duration
+            self.load_default_cover()
         try:
             from mutagen import File as MutagenFile
             mf = MutagenFile(node.path)
@@ -900,7 +1016,6 @@ class ModernMusicPlayer(QWidget):
         except:
             dur = 0
             self.song_duration = 0
-        # Always provide a safe, non-zero maximum for the slider
         self.progress_slider.setMaximum(max(dur, 1))
         self.progress_slider.setValue(0)
         self.total_time_label.setText(self.format_time(dur))
@@ -917,13 +1032,11 @@ class ModernMusicPlayer(QWidget):
             self.play_pause_btn.setText("|> ")
         else:
             if self.current_node:
-                # If we have a current node, resume/restart it
                 if self.player.is_paused():
                     self.player.resume()
                     self.playing = True
                     self.play_pause_btn.setText("||")
                 else:
-                    # Restart the current song
                     self.play_node(self.current_node)
             else:
                 self.play_selected()
@@ -958,7 +1071,6 @@ class ModernMusicPlayer(QWidget):
                 self.progress_slider.setValue(absolute_pos)
                 self.progress_slider.blockSignals(False)
                 self.current_time_label.setText(self.format_time(absolute_pos))
-            # End of song detection
             if self.song_duration > 0 and self.current_position >= self.song_duration - 1:
                 self.playing = False
                 self.play_pause_btn.setText("|> ")
@@ -971,42 +1083,42 @@ class ModernMusicPlayer(QWidget):
 
     # ----------------- Top & Recent -----------------
     def update_top_played_ui(self):
-        self.top_played_list.clear()
         top = self.heap.get_top(10)
-        for t, c in top:
-            item = QListWidgetItem(f"{t} · {c} plays")
-            self.top_played_list.addItem(item)
+        if top != self.last_top_played:
+            self.top_played_list.clear()
+            for t, c in top:
+                item = QListWidgetItem(f"{t} · {c} plays")
+                self.top_played_list.addItem(item)
+            self.last_top_played = top
 
     def update_recently_played_ui(self):
-        self.history_list.clear()
-        for t in self.history.get_all():
-            self.history_list.addItem(t)
+        recent = self.history.get_all()
+        if recent != self.last_recently_played:
+            self.history_list.clear()
+            for t in recent:
+                self.history_list.addItem(t)
+            self.last_recently_played = recent
 
     # ----------------- Upcoming Queue -----------------
     def update_upcoming_ui(self):
-        self.upcoming_list.clear()
-        for i in range(self.upcoming.size):
-            idx = (self.upcoming.front + i) % self.upcoming.capacity
-            t = self.upcoming.queue[idx]
-            if t:
-                self.upcoming_list.addItem(t)
+        upcoming = [self.upcoming.queue[(self.upcoming.front + i) % self.upcoming.capacity] for i in range(self.upcoming.size)]
+        if upcoming != self.last_upcoming:
+            self.upcoming_list.clear()
+            for t in upcoming:
+                if t:
+                    self.upcoming_list.addItem(t)
+            self.last_upcoming = upcoming
 
     def add_to_upcoming(self, title):
         self.upcoming.enqueue(title)
         self.update_upcoming_ui()
 
     def update_interface_for_current_song(self):
-        """Update the right side interface (cover, info) for current song"""
         if self.current_node:
-            # Update album cover
             if not self.try_set_cover(self.current_node.path):
                 self.load_default_cover()
-            
-            # Update song information display if there are any info labels
-            # This ensures the right side panel refreshes when a new song plays
 
     def play_next_from_upcoming(self):
-        # Reset any drag state to avoid desync after switching tracks
         self.slider_being_dragged = False
         title = self.upcoming.dequeue()
         if not title:
@@ -1015,7 +1127,6 @@ class ModernMusicPlayer(QWidget):
         node = self.song_map.search_song(title)
         if node:
             self.play_node(node)
-            # Update the right side interface
             self.update_interface_for_current_song()
         self.update_upcoming_ui()
 
@@ -1027,9 +1138,7 @@ class ModernMusicPlayer(QWidget):
 
     # ----------------- Slider Handlers -----------------
     def slider_position_changed(self, position: int):
-        # Always reflect the selected position in the label
         self.current_time_label.setText(self.format_time(position))
-        # If this is a single-click jump (not dragging), seek immediately
         if not self.slider_being_dragged and self.current_node and self.playing:
             self.seek_to(position)
 
@@ -1039,7 +1148,6 @@ class ModernMusicPlayer(QWidget):
     def slider_released(self):
         self.slider_being_dragged = False
         if self.current_node and self.playing:
-            # Seek to the chosen position when drag ends
             new_pos = self.progress_slider.value()
             self.seek_to(new_pos)
 
@@ -1047,10 +1155,8 @@ class ModernMusicPlayer(QWidget):
         try:
             pygame.mixer.music.stop()
             pygame.mixer.music.load(self.current_node.path)
-            # Record the base offset so pygame's get_pos (which is relative to start) can be converted to absolute
             self.play_start_offset = int(position)
             pygame.mixer.music.play(start=float(position))
-            # Update UI state to reflect new position
             self.current_position = int(position)
             self.progress_slider.blockSignals(True)
             self.progress_slider.setValue(self.current_position)
@@ -1058,8 +1164,6 @@ class ModernMusicPlayer(QWidget):
             self.current_time_label.setText(self.format_time(self.current_position))
         except Exception as e:
             print(f"Seek error: {e}")
-
-
 
 # ----------------- Run -----------------
 if __name__ == "__main__":
