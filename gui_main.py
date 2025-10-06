@@ -256,9 +256,10 @@ class ModernMusicPlayer(QWidget):
                 color: #cccccc;
                 font-size: 13px;
                 spacing: 8px;
+                max-width: 120px;
             }
             QCheckBox::indicator {
-                width: 40px;
+                width: 30px;
                 height: 20px;
                 border-radius: 10px;
                 background-color: rgba(60, 60, 60, 0.7);
@@ -322,6 +323,24 @@ class ModernMusicPlayer(QWidget):
                 color: #000000;
                 font-weight: 600;
             }
+            QListWidget::verticalScrollBar {
+                background: rgba(20, 20, 20, 0.8);
+                width: 8px;
+                margin: 0;
+            }
+            QListWidget::verticalScrollBar:vertical {
+                border: none;
+                border-radius: 4px;
+            }
+            QListWidget::handle:vertical {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D94F00, stop:1 #E56A00);
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QListWidget::add:vertical, QListWidget::sub:vertical {
+                background: transparent;
+            }
         """)
         side_layout.addWidget(self.list_widget, stretch=3)
 
@@ -381,6 +400,24 @@ class ModernMusicPlayer(QWidget):
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #D94F00, stop:1 #E56A00);
                 color: #000000;
+            }
+            QListWidget::verticalScrollBar {
+                background: rgba(20, 20, 20, 0.8);
+                width: 8px;
+                margin: 0;
+            }
+            QListWidget::verticalScrollBar:vertical {
+                border: none;
+                border-radius: 4px;
+            }
+            QListWidget::handle:vertical {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D94F00, stop:1 #E56A00);
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QListWidget::add:vertical, QListWidget::sub:vertical {
+                background: transparent;
             }
         """)
         side_layout.addWidget(self.upcoming_list, stretch=1)
@@ -528,6 +565,24 @@ class ModernMusicPlayer(QWidget):
                     stop:0 #D94F00, stop:1 #E56A00);
                 color: #000000;
             }
+            QListWidget::verticalScrollBar {
+                background: rgba(20, 20, 20, 0.8);
+                width: 8px;
+                margin: 0;
+            }
+            QListWidget::verticalScrollBar:vertical {
+                border: none;
+                border-radius: 4px;
+            }
+            QListWidget::handle:vertical {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D94F00, stop:1 #E56A00);
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QListWidget::add:vertical, QListWidget::sub:vertical {
+                background: transparent;
+            }
         """)
         top_card_layout.addWidget(self.top_played_list)
         stats_section.addWidget(top_card_frame)
@@ -552,7 +607,42 @@ class ModernMusicPlayer(QWidget):
         recent_card_layout.addWidget(recent_header)
         
         self.history_list = QListWidget()
-        self.history_list.setStyleSheet(self.top_played_list.styleSheet())
+        self.history_list.setStyleSheet("""
+            QListWidget {
+                background-color: transparent;
+                border: none;
+                font-size: 13px;
+            }
+            QListWidget::item {
+                color: #dddddd;
+                padding: 10px;
+                border-radius: 6px;
+                margin: 2px 0;
+            }
+            QListWidget::item:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D94F00, stop:1 #E56A00);
+                color: #000000;
+            }
+            QListWidget::verticalScrollBar {
+                background: rgba(20, 20, 20, 0.8);
+                width: 8px;
+                margin: 0;
+            }
+            QListWidget::verticalScrollBar:vertical {
+                border: none;
+                border-radius: 4px;
+            }
+            QListWidget::handle:vertical {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D94F00, stop:1 #E56A00);
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QListWidget::add:vertical, QListWidget::sub:vertical {
+                background: transparent;
+            }
+        """)
         recent_card_layout.addWidget(self.history_list)
         stats_section.addWidget(recent_card_frame)
 
