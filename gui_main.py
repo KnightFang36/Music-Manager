@@ -161,8 +161,12 @@ class SpotifyStyleGUI(QWidget):
         center_layout.setContentsMargins(40,40,40,40)
         center_layout.setSpacing(40)
 
-        # Album Cover & controls
-        album_container = QVBoxLayout()
+        # Album Cover & controls container
+        album_widget = QWidget()
+        album_widget.setFixedWidth(450)  # fixed width
+        album_container = QVBoxLayout(album_widget)
+        album_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         self.cover_label = QLabel()
         self.cover_label.setFixedSize(400,400)
         self.cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -174,7 +178,7 @@ class SpotifyStyleGUI(QWidget):
         self.song_label.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
         self.song_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.song_label.setStyleSheet("color:white;padding:10px;")
-        album_container.addWidget(self.song_label)
+        album_container.addWidget(self.song_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Progress slider
         time_layout = QHBoxLayout()
@@ -230,13 +234,18 @@ class SpotifyStyleGUI(QWidget):
         vol_layout.addWidget(self.vol_percentage_label)
         album_container.addLayout(vol_layout)
 
-        center_layout.addLayout(album_container)
+        center_layout.addWidget(album_widget, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Right lists
-        right_lists = QVBoxLayout()
+        # Right lists container
+        right_widget = QWidget()
+        right_widget.setFixedWidth(450)  # same width for symmetry
+        right_lists = QVBoxLayout(right_widget)
+        right_lists.setAlignment(Qt.AlignmentFlag.AlignTop)
+
         top_label = QLabel("Top Played", alignment=Qt.AlignmentFlag.AlignCenter)
         top_label.setStyleSheet("font-weight:bold;font-size:15px;")
         right_lists.addWidget(top_label)
+
         self.top_played_list = QListWidget()
         self.top_played_list.setStyleSheet("background-color:#121212;color:white;font-size:13px;")
         right_lists.addWidget(self.top_played_list)
@@ -244,11 +253,12 @@ class SpotifyStyleGUI(QWidget):
         recent_label = QLabel("Recently Played", alignment=Qt.AlignmentFlag.AlignCenter)
         recent_label.setStyleSheet("font-weight:bold;font-size:15px;margin-top:10px;")
         right_lists.addWidget(recent_label)
+
         self.history_list = QListWidget()
         self.history_list.setStyleSheet("background-color:#121212;color:white;font-size:13px;")
         right_lists.addWidget(self.history_list)
 
-        center_layout.addLayout(right_lists)
+        center_layout.addWidget(right_widget)
         main_layout.addWidget(center_container)
 
         # ----------------- Connections -----------------
