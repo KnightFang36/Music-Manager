@@ -1,8 +1,8 @@
 import sys, os
 from urllib.request import urlopen
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, 
-    QPushButton, QSlider, QCheckBox
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel,
+    QPushButton, QSlider, QCheckBox, QLineEdit
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QPixmap
@@ -10,11 +10,12 @@ from playlist_dll import Playlist
 from hashmap import SongMap
 from heap_bst import SongHeap
 from bst import BST
-from stack_queue import RecentlyPlayed
+from stack_queue import RecentlyPlayed, UpcomingSongs
 from player import MusicPlayer
 
 
-SONG_DIR = "songs"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SONG_DIR = os.path.join(BASE_DIR, "songs")
 DEFAULT_COVER_URL = "https://i.pinimg.com/originals/48/71/8f/48718f3afca6b1b4296141d5cbd96619.jpg"
 
 
@@ -34,11 +35,13 @@ class SpotifyStyleGUI(QWidget):
         self.player = MusicPlayer()
         self.current_node = None
         self.playing = False
+        self.upcoming = UpcomingSongs()
 
         self.setup_ui()
         self.load_songs()
         self.update_top_played_ui()
         self.update_recently_played_ui()
+        self.update_upcoming_ui()
 
     def setup_ui(self):
         main_layout = QHBoxLayout(self)
@@ -51,6 +54,7 @@ class SpotifyStyleGUI(QWidget):
         sidebar_layout.setContentsMargins(10, 10, 10, 10)
         sidebar_layout.setSpacing(15)
 
+
         # Playlist label & sorting toggle
         playlist_label = QLabel("Playlist", alignment=Qt.AlignmentFlag.AlignCenter)
         playlist_label.setStyleSheet("font-weight: bold; font-size: 15px;")
@@ -61,6 +65,13 @@ class SpotifyStyleGUI(QWidget):
         self.sort_toggle.setFixedWidth(160)
         self.sort_toggle.stateChanged.connect(self.toggle_sorting)
         sidebar_layout.addWidget(self.sort_toggle)
+
+        # Search bar
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search title...")
+        self.search_input.setStyleSheet("background-color: #1e1e1e; color: white; border: 1px solid #2c2c2c; padding: 6px; border-radius: 4px;")
+        self.search_input.textChanged.connect(self.update_playlist_display)
+        sidebar_layout.addWidget(self.search_input)
 
         # Playlist QListWidget
         self.list_widget = QListWidget()
@@ -75,6 +86,28 @@ class SpotifyStyleGUI(QWidget):
         )
         self.list_widget.setFixedWidth(280)
         sidebar_layout.addWidget(self.list_widget)
+
+        # Enqueue selected button (for playlist)
+        self.enqueue_selected_btn = QPushButton("Enqueue Selected")
+        self.enqueue_selected_btn.setStyleSheet("background-color: #FF4500; color: white; font-size: 13px; border-radius: 6px; padding: 6px;")
+        self.enqueue_selected_btn.clicked.connect(self.enqueue_selected)
+        sidebar_layout.addWidget(self.enqueue_selected_btn)
+
+        # Upcoming queue label and list
+        upcoming_label = QLabel("Upcoming Queue", alignment=Qt.AlignmentFlag.AlignCenter)
+        upcoming_label.setStyleSheet("font-weight: bold; font-size: 15px; margin-top: 10px;")
+        sidebar_layout.addWidget(upcoming_label)
+
+        self.upcoming_list = QListWidget()
+        self.upcoming_list.setStyleSheet("background-color: #1e1e1e; color: white; font-size: 13px;")
+        self.upcoming_list.setFixedWidth(280)
+        sidebar_layout.addWidget(self.upcoming_list)
+
+        # Add button to play next from upcoming
+        self.play_next_upcoming_btn = QPushButton("Play Next from Upcoming")
+        self.play_next_upcoming_btn.setStyleSheet("background-color: #FF4500; color: white; font-size: 13px; border-radius: 6px; padding: 6px;")
+        self.play_next_upcoming_btn.clicked.connect(self.play_next_from_upcoming)
+        sidebar_layout.addWidget(self.play_next_upcoming_btn)
 
         # Top Played songs
         top_label = QLabel("Top Played", alignment=Qt.AlignmentFlag.AlignCenter)
@@ -230,6 +263,11 @@ class SpotifyStyleGUI(QWidget):
         self.vol_slider.valueChanged.connect(self.set_volume)
         self.progress_slider.sliderPressed.connect(self.slider_pressed)
         self.progress_slider.sliderReleased.connect(self.slider_released)
+        self.upcoming_list.itemDoubleClicked.connect(self.enqueue_selected_from_upcoming)
+        # Double-click to play directly from Recently Played list
+        self.history_list.itemDoubleClicked.connect(self.play_selected_recently_played)
+        # Double-click to play directly from Top Played list
+        self.top_played_list.itemDoubleClicked.connect(self.play_selected_top_played)
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_progress)
@@ -284,14 +322,21 @@ class SpotifyStyleGUI(QWidget):
 
     def update_playlist_display(self):
         self.list_widget.clear()
+        filter_text = ""
+        try:
+            filter_text = self.search_input.text().strip().lower()
+        except Exception:
+            pass
         if self.sort_toggle.isChecked():
             sorted_titles = self.get_bst_sorted_titles()
             for title in sorted_titles:
-                self.list_widget.addItem(title)
+                if not filter_text or filter_text in title.lower():
+                    self.list_widget.addItem(title)
         else:
             cur = self.playlist.head
             while cur:
-                self.list_widget.addItem(cur.title)
+                if not filter_text or filter_text in cur.title.lower():
+                    self.list_widget.addItem(cur.title)
                 cur = cur.next
 
     def toggle_sorting(self, state):
@@ -304,6 +349,40 @@ class SpotifyStyleGUI(QWidget):
         node = self.song_map.search_song(item.text())
         if node:
             self.play_node(node)
+
+    def enqueue_selected_from_upcoming(self):
+        # Not used, but could allow double-click to play from upcoming
+        self.play_next_from_upcoming()
+    def play_selected_top_played(self, item):
+        if item is None:
+            return
+        text = item.text()
+        # Items are formatted as "<title> - Plays: <count>"
+        title = text.split(" - Plays:")[0].strip()
+        node = self.song_map.search_song(title)
+        if node:
+            self.play_node(node)
+    def play_next_from_upcoming(self):
+        title = self.upcoming.dequeue()
+        if not title:
+            self.song_label.setText("No upcoming songs.")
+            return
+        node = self.song_map.search_song(title)
+        if node:
+            self.play_node(node)
+        self.update_upcoming_ui()
+
+    def update_upcoming_ui(self):
+        self.upcoming_list.clear()
+        for i in range(self.upcoming.size):
+            idx = (self.upcoming.front + i) % self.upcoming.capacity
+            title = self.upcoming.queue[idx]
+            if title:
+                self.upcoming_list.addItem(title)
+
+    def add_to_upcoming(self, title):
+        self.upcoming.enqueue(title)
+        self.update_upcoming_ui()
 
     def toggle_play_pause(self):
         if self.playing:
@@ -323,18 +402,47 @@ class SpotifyStyleGUI(QWidget):
         self.playing = True
         self.play_pause_btn.setText("||")
 
+        # Try to set cover art from MP3 metadata
+        if not self.try_set_cover(node.path):
+            # fallback remains whatever is on the label
+            pass
+
+        # Accurate duration via mutagen
+        duration = None
         try:
-            import pygame
-            sound = pygame.mixer.Sound(node.path)
-            duration = sound.get_length()
+            from mutagen import File as MutagenFile
+            mf = MutagenFile(node.path)
+            if mf is not None and hasattr(mf, 'info') and mf.info is not None:
+                duration = getattr(mf.info, 'length', None)
+        except Exception:
+            duration = None
+        if duration is not None:
             self.progress_slider.setMaximum(int(duration))
             self.total_time_label.setText(self.format_time(duration))
-        except:
-            self.progress_slider.setMaximum(100)
-            self.total_time_label.setText("0:00")
+        else:
+            try:
+                import pygame
+                sound = pygame.mixer.Sound(node.path)
+                duration = sound.get_length()
+                self.progress_slider.setMaximum(int(duration))
+                self.total_time_label.setText(self.format_time(duration))
+            except Exception:
+                self.progress_slider.setMaximum(100)
+                self.total_time_label.setText("0:00")
 
         self.update_top_played_ui()
         self.update_recently_played_ui()
+        self.update_upcoming_ui()
+    # Add a context menu or button to enqueue a song from the playlist
+    # For now, right-click is not handled, but you can add a button or menu
+    # Example: add a button to enqueue the selected song
+
+    # Add this method to allow enqueuing from the playlist
+    def enqueue_selected(self):
+        item = self.list_widget.currentItem()
+        if item is None:
+            return
+        self.add_to_upcoming(item.text())
 
     def pause_song(self):
         self.player.pause()
@@ -366,9 +474,31 @@ class SpotifyStyleGUI(QWidget):
         if self.playing:
             new_pos = self.progress_slider.value()
             try:
-                pass
+                # Attempt to seek (support varies by format/backend)
+                import pygame
+                pygame.mixer.music.stop()
+                # Some backends support 'start' argument for OGG; MP3 support varies.
+                # We attempt restart; if unsupported, it will just start from 0.
+                pygame.mixer.music.load(self.current_node.path)
+                pygame.mixer.music.play(start=new_pos)
             except:
                 pass
+    def try_set_cover(self, path):
+        # Try to read embedded cover art from ID3 APIC
+        try:
+            from mutagen.id3 import ID3
+            tags = ID3(path)
+            apics = tags.getall('APIC')
+            if apics:
+                data = apics[0].data
+                pixmap = QPixmap()
+                if pixmap.loadFromData(data):
+                    scaled_pixmap = pixmap.scaled(350, 350, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                    self.cover_label.setPixmap(scaled_pixmap)
+                    return True
+        except Exception:
+            pass
+        return False
 
     def update_progress(self):
         if self.playing and self.player.is_playing() and not self.slider_being_dragged:
@@ -400,6 +530,15 @@ class SpotifyStyleGUI(QWidget):
         recent_songs = self.history.get_all()
         for title in recent_songs:
             self.history_list.addItem(title)
+
+    def play_selected_recently_played(self, item):
+        if item is None:
+            return
+        title = item.text().strip()
+        node = self.song_map.search_song(title)
+        if node:
+            self.play_node(node)
+
 
 
 if __name__ == "__main__":

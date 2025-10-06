@@ -8,8 +8,9 @@ from stack_queue import RecentlyPlayed, UpcomingSongs
 from heap_bst import SongHeap, SongBST
 from player import MusicPlayer
 
-DATA_DIR = 'data'
-SONG_DIR = 'songs'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+SONG_DIR = os.path.join(BASE_DIR, 'songs')
 PLAY_COUNTS = os.path.join(DATA_DIR, 'play_counts.json')
 
 
@@ -62,6 +63,7 @@ def print_menu():
     print('5. Next / Previous during playing')
     print('6. Add song to upcoming queue')
     print('7. Show upcoming')
+    print('7.5 Play next from upcoming')
     print('8. Search')
     print('9. Shuffle playlist')
     print('10. Delete song from playlist')
@@ -126,7 +128,8 @@ def main():
                 heap.add_play(node.title)
 
             elif choice == '4':
-                if player.is_playing():
+                # Offer controls if a track is loaded (playing or paused)
+                if current_node or player.is_playing() or player.is_paused():
                     sub = input('P=Pause, R=Resume, S=Stop: ').strip().lower()
                     if sub == 'p':
                         player.pause(); print('Paused')
@@ -137,7 +140,7 @@ def main():
                     else:
                         print('Invalid')
                 else:
-                    print('No song is currently playing.')
+                    print('No song is currently loaded.')
 
             elif choice == '5':
                 if current_node is None:
@@ -169,6 +172,21 @@ def main():
             elif choice == '7':
                 upcoming.show()
 
+            elif choice == '7.5':
+                title = upcoming.dequeue()
+                if not title:
+                    print('Upcoming queue is empty.')
+                else:
+                    node = song_map.search_song(title)
+                    if not node:
+                        print('Song not found in playlist.')
+                    else:
+                        current_node = node
+                        print(f"Now playing: {node.title}")
+                        player.play(node.path)
+                        history.push(node.title)
+                        heap.add_play(node.title)
+
             elif choice == '8':
                 q = input('Search by substring: ').strip().lower()
                 matches = []
@@ -187,7 +205,8 @@ def main():
             elif choice == '9':
                 playlist.shuffle_playlist()
                 song_map.rebuild_from_playlist(playlist)
-                print('Playlist shuffled')
+                current_node = playlist.head
+                print('Playlist shuffled. Reset to first track.')
 
             elif choice == '10':
                 playlist.display_playlist()

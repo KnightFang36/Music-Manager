@@ -4,11 +4,16 @@ from collections import deque
 from typing import Optional
 
 class RecentlyPlayed:
-    def __init__(self):
+    def __init__(self, max_size: int | None = None):
+        # Optional bounded stack; if max_size is set, trim oldest when exceeding
         self.stack = []
+        self.max_size = max_size
 
     def push(self, title):
         self.stack.append(title)
+        if self.max_size is not None and len(self.stack) > self.max_size:
+            # Remove the oldest (bottom of stack)
+            self.stack.pop(0)
 
     def pop(self):
         if self.stack:
@@ -24,6 +29,14 @@ class RecentlyPlayed:
 
     def __len__(self):
         return len(self.stack)
+
+    def show(self) -> None:
+        if not self.stack:
+            print("No history.")
+            return
+        print("\n🕘 Recently Played:")
+        for i, title in enumerate(self.get_all(), 1):
+            print(f"{i}. {title}")
 
 
 class UpcomingSongs:

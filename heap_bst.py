@@ -3,20 +3,24 @@ import heapq
 class SongHeap:
     def __init__(self):
         # Map to track play counts: {title: count}
-        self.count_map = {}
+        # Named 'counter' to match main.py expectations
+        self.counter = {}
+        # Backward-compat alias if other modules reference count_map
+        self.count_map = self.counter
         # Heap as list of (-count, title) for max-heap behavior
         self.heap_list = []
 
     def add_play(self, title):
-        if title in self.count_map:
-            self.count_map[title] += 1
+        # Increment play count and rebuild heap
+        if title in self.counter:
+            self.counter[title] += 1
         else:
-            self.count_map[title] = 1
+            self.counter[title] = 1
         self._rebuild_heap()
 
     def _rebuild_heap(self):
-        # Rebuild the heap from count_map items
-        self.heap_list = [(-count, title) for title, count in self.count_map.items()]
+        # Rebuild the heap from current counters
+        self.heap_list = [(-count, title) for title, count in self.counter.items()]
         heapq.heapify(self.heap_list)
 
     def get_top(self, n=10):
@@ -28,6 +32,16 @@ class SongHeap:
             count_neg, title = heapq.heappop(heap_copy)
             top.append((title, -count_neg))
         return top
+
+    def show_top(self, n=10):
+        # Pretty-print top N songs (used by console app)
+        top = self.get_top(n)
+        if not top:
+            print("No plays recorded yet.")
+            return
+        print("\n🎯 Top Played Songs:")
+        for i, (title, cnt) in enumerate(top, 1):
+            print(f"{i}. {title} — {cnt} plays")
 
 
 class Node:
@@ -72,3 +86,7 @@ class BST:
 
         _inorder(self.root)
         return result
+
+# Alias class name expected by main.py
+class SongBST(BST):
+    pass

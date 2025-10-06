@@ -10,6 +10,8 @@ class MusicPlayer:
         pygame.mixer.init()
         self.play_thread = None
         self.stop_event = threading.Event()
+        self.paused = False
+        self.current_path: str | None = None
 
     def _play_worker(self, path: str):
         try:
@@ -32,6 +34,8 @@ class MusicPlayer:
             return
         self.stop()
         self.stop_event.clear()
+        self.paused = False
+        self.current_path = path
         self.play_thread = threading.Thread(target=self._play_worker, args=(path,), daemon=True)
         self.play_thread.start()
 
@@ -46,24 +50,30 @@ class MusicPlayer:
             self.play_thread.join(timeout=0.5)
         self.play_thread = None
         self.stop_event.clear()
+        self.paused = False
 
     def pause(self) -> None:
         try:
             pygame.mixer.music.pause()
         except Exception:
             pass
+        self.paused = True
 
     def resume(self) -> None:
         try:
             pygame.mixer.music.unpause()
         except Exception:
             pass
+        self.paused = False
 
     def is_playing(self) -> bool:
         try:
             return pygame.mixer.music.get_busy()
         except Exception:
             return False
+
+    def is_paused(self) -> bool:
+        return self.paused
 
     def set_volume(self, vol: float) -> None:
         # vol between 0.0 and 1.0
