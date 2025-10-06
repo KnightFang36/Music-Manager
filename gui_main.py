@@ -62,42 +62,69 @@ def save_recent_history(history: RecentlyPlayed):
     except Exception as e:
         print('Could not save recently played history:', e)
 
-# ----------------- Clickable Slider Class -----------------
+# ----------------- Simplified Slider Class -----------------
 class ClickableSlider(QSlider):
     positionChanged = pyqtSignal(int)
     def __init__(self, orientation):
         super().__init__(orientation)
         self.user_is_setting = False
+        self.drag_enabled = False  # Only allow dragging after double-click
         self.valueChanged.connect(self._on_value_changed)
+
     def _on_value_changed(self, value):
         if self.user_is_setting:
             self.positionChanged.emit(value)
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self.user_is_setting = True
-            value = QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), int(event.position().x()), self.width())
-            self.setValue(value)
-            self.positionChanged.emit(value)
-            super().mousePressEvent(event)
-        else:
-            super().mousePressEvent(event)
+            # If drag is not enabled, treat single-click as jump-to-position
+            if not self.drag_enabled:
+                self.user_is_setting = True
+                value = QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), int(event.position().x()), self.width())
+                self.setValue(value)
+                self.positionChanged.emit(value)
+                # Don't call super to avoid entering drag mode on single click
+                return
+            else:
+                # Drag mode enabled: allow normal behavior
+                self.user_is_setting = True
+        super().mousePressEvent(event)
+
     def mouseMoveEvent(self, event):
-        if self.user_is_setting:
+        if self.drag_enabled and self.user_is_setting:
             value = QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), int(event.position().x()), self.width())
             self.setValue(value)
             self.positionChanged.emit(value)
-        super().mouseMoveEvent(event)
+            # Also allow default dragging behavior
+            super().mouseMoveEvent(event)
+        else:
+            # Ignore move when not in drag mode
+            event.ignore()
+
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.user_is_setting = False
+            # Exiting drag mode when releasing the handle
+            if self.drag_enabled:
+                self.drag_enabled = False
         super().mouseReleaseEvent(event)
-    def set_position(self, pos, emit=False):
-        if not self.user_is_setting:
-            self.blockSignals(True)
-            self.setValue(pos)
-            self.blockSignals(False)
-            if emit:
-                self.positionChanged.emit(pos)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Determine if the double-click is near the handle
+            handle_x = QStyle.sliderPositionFromValue(self.minimum(), self.maximum(), self.value(), self.width())
+            click_x = int(event.position().x())
+            if abs(click_x - handle_x) <= 12:
+                # Near the handle: enable drag mode
+                self.drag_enabled = True
+                super().mouseDoubleClickEvent(event)
+            else:
+                # Away from handle: treat as jump-to-position
+                value = QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), click_x, self.width())
+                self.setValue(value)
+                self.positionChanged.emit(value)
+        else:
+            super().mouseDoubleClickEvent(event)
 
 # ----------------- Main GUI Class -----------------
 class ModernMusicPlayer(QWidget):
@@ -125,11 +152,16 @@ class ModernMusicPlayer(QWidget):
         self.playing = False
         self.upcoming = UpcomingSongs()
         self.slider_being_dragged = False
-
-        # Playback position tracking
-        self.play_start_offset = 0.0
         self.current_position = 0
-        self.is_seeking = False
+        self.autoplay_enabled = True
+        self.song_duration = 0
+        # Offset within the track when (re)starting playback, so UI shows absolute position
+        self.play_start_offset = 0
+
+        # Timer for UI sync (50ms)
+        self.progress_timer = QTimer(self)
+        self.progress_timer.timeout.connect(self.update_progress)
+        self.progress_timer.start(50)
 
         # Load data
         load_play_counts(self.heap)
@@ -376,6 +408,30 @@ class ModernMusicPlayer(QWidget):
         """)
         self.play_next_upcoming_btn.clicked.connect(self.play_next_from_upcoming)
         side_layout.addWidget(self.play_next_upcoming_btn)
+
+        # Autoplay Checkbox
+        self.autoplay_checkbox = QCheckBox("🔄 Autoplay Queue")
+        self.autoplay_checkbox.setStyleSheet("""
+            QCheckBox {
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: 500;
+                padding: 5px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #D94F00;
+                border-radius: 4px;
+                background-color: transparent;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #D94F00;
+                border: 2px solid #D94F00;
+            }
+        """)
+        self.autoplay_checkbox.setChecked(True)  # Default to enabled
+        side_layout.addWidget(self.autoplay_checkbox)
 
         main_layout.addWidget(sidebar)
 
@@ -823,29 +879,36 @@ class ModernMusicPlayer(QWidget):
     def play_node(self, node):
         self.current_node = node
         self.song_label.setText(f"🎵 {node.title}")
+        self.current_position = 0
+        self.play_start_offset = 0
+        self.slider_being_dragged = False
+        self.playing = True
+        self.play_pause_btn.setText("||")
         self.player.play(node.path)
         self.history.push(node.title)
         self.heap.add_play(node.title)
         save_play_counts(self.heap)
         save_recent_history(self.history)
-        self.playing = True
-        self.play_pause_btn.setText("||")
         if not self.try_set_cover(node.path):
             pass
-        # Duration
+        # Get duration
         try:
             from mutagen import File as MutagenFile
             mf = MutagenFile(node.path)
-            dur = getattr(mf.info, 'length', 0)
-            self.progress_slider.setMaximum(int(dur))
-            # self.total_time_label.setText(f"{int(dur//60)}:{int(dur%60):02d}")
-            self.total_time_label.setText(self.format_time(dur))
+            dur = int(getattr(mf.info, 'length', 0))
+            self.song_duration = dur
         except:
-            self.progress_slider.setMaximum(100)
-            self.total_time_label.setText("0:00")
+            dur = 0
+            self.song_duration = 0
+        # Always provide a safe, non-zero maximum for the slider
+        self.progress_slider.setMaximum(max(dur, 1))
+        self.progress_slider.setValue(0)
+        self.total_time_label.setText(self.format_time(dur))
+        self.current_time_label.setText("0:00")
         self.update_top_played_ui()
         self.update_recently_played_ui()
         self.update_upcoming_ui()
+        self.update_interface_for_current_song()
 
     def toggle_play_pause(self):
         if self.playing:
@@ -854,13 +917,23 @@ class ModernMusicPlayer(QWidget):
             self.play_pause_btn.setText("|> ")
         else:
             if self.current_node:
-                self.play_node(self.current_node)
+                # If we have a current node, resume/restart it
+                if self.player.is_paused():
+                    self.player.resume()
+                    self.playing = True
+                    self.play_pause_btn.setText("||")
+                else:
+                    # Restart the current song
+                    self.play_node(self.current_node)
             else:
                 self.play_selected()
 
     def next_song(self):
         if self.current_node and self.current_node.next:
             self.play_node(self.current_node.next)
+        else:
+            self.playing = False
+            self.play_pause_btn.setText("|> ")
 
     def prev_song(self):
         if self.current_node and self.current_node.prev:
@@ -872,24 +945,29 @@ class ModernMusicPlayer(QWidget):
 
     # ----------------- Progress -----------------
     def update_progress(self):
-        if self.playing and self.player.is_playing() and not self.slider_being_dragged:
-            try:
-                rel = pygame.mixer.music.get_pos() / 1000.0
-                if rel >= 0:
-                    abs_pos = self.play_start_offset + rel
-                    self.current_position = abs_pos
-                    self.progress_slider.set_position(int(abs_pos))
-                    self.current_time_label.setText(self.format_time(abs_pos))
-                if not pygame.mixer.music.get_busy() and self.playing:
-                    self.playing = False
-                    self.play_pause_btn.setText("|> ")
+        if not self.playing:
+            return
+        try:
+            if not self.slider_being_dragged:
+                pos = pygame.mixer.music.get_pos() // 1000
+                if pos < 0:
+                    pos = 0
+                absolute_pos = self.play_start_offset + pos
+                self.current_position = absolute_pos
+                self.progress_slider.blockSignals(True)
+                self.progress_slider.setValue(absolute_pos)
+                self.progress_slider.blockSignals(False)
+                self.current_time_label.setText(self.format_time(absolute_pos))
+            # End of song detection
+            if self.song_duration > 0 and self.current_position >= self.song_duration - 1:
+                self.playing = False
+                self.play_pause_btn.setText("|> ")
+                if self.autoplay_checkbox.isChecked() and self.upcoming.size > 0:
+                    self.play_next_from_upcoming()
+                else:
                     self.next_song()
-            except KeyboardInterrupt:
-                print("Program interrupted by user")
-                self.player.stop()
-                sys.exit(0)
-            except Exception as e:
-                print(f"Error in update_progress: {e}")
+        except Exception as e:
+            print(f"Error in update_progress: {e}")
 
     # ----------------- Top & Recent -----------------
     def update_top_played_ui(self):
@@ -917,7 +995,19 @@ class ModernMusicPlayer(QWidget):
         self.upcoming.enqueue(title)
         self.update_upcoming_ui()
 
+    def update_interface_for_current_song(self):
+        """Update the right side interface (cover, info) for current song"""
+        if self.current_node:
+            # Update album cover
+            if not self.try_set_cover(self.current_node.path):
+                self.load_default_cover()
+            
+            # Update song information display if there are any info labels
+            # This ensures the right side panel refreshes when a new song plays
+
     def play_next_from_upcoming(self):
+        # Reset any drag state to avoid desync after switching tracks
+        self.slider_being_dragged = False
         title = self.upcoming.dequeue()
         if not title:
             self.song_label.setText("No upcoming songs")
@@ -925,6 +1015,8 @@ class ModernMusicPlayer(QWidget):
         node = self.song_map.search_song(title)
         if node:
             self.play_node(node)
+            # Update the right side interface
+            self.update_interface_for_current_song()
         self.update_upcoming_ui()
 
     # ----------------- Time Formatting -----------------
@@ -935,37 +1027,39 @@ class ModernMusicPlayer(QWidget):
 
     # ----------------- Slider Handlers -----------------
     def slider_position_changed(self, position: int):
+        # Always reflect the selected position in the label
         self.current_time_label.setText(self.format_time(position))
-        self.current_position = position
-        if self.current_node and self.slider_being_dragged and self.playing:
+        # If this is a single-click jump (not dragging), seek immediately
+        if not self.slider_being_dragged and self.current_node and self.playing:
             self.seek_to(position)
 
     def slider_pressed(self):
         self.slider_being_dragged = True
-        self.is_seeking = True
 
     def slider_released(self):
         self.slider_being_dragged = False
-        new_pos = self.progress_slider.value()
-        self.current_position = new_pos
-        self.current_time_label.setText(self.format_time(new_pos))
-        if self.current_node:
-            if self.playing:
-                self.seek_to(new_pos)
-            else:
-                self.play_start_offset = float(new_pos)
-                self.progress_slider.set_position(new_pos, emit=True)
+        if self.current_node and self.playing:
+            # Seek to the chosen position when drag ends
+            new_pos = self.progress_slider.value()
+            self.seek_to(new_pos)
 
-    def seek_to(self, position: float):
+    def seek_to(self, position: int):
         try:
-            self.play_start_offset = float(position)
             pygame.mixer.music.stop()
             pygame.mixer.music.load(self.current_node.path)
-            pygame.mixer.music.play(start=position)
-            self.progress_slider.set_position(int(position))
-            self.current_time_label.setText(self.format_time(position))
+            # Record the base offset so pygame's get_pos (which is relative to start) can be converted to absolute
+            self.play_start_offset = int(position)
+            pygame.mixer.music.play(start=float(position))
+            # Update UI state to reflect new position
+            self.current_position = int(position)
+            self.progress_slider.blockSignals(True)
+            self.progress_slider.setValue(self.current_position)
+            self.progress_slider.blockSignals(False)
+            self.current_time_label.setText(self.format_time(self.current_position))
         except Exception as e:
             print(f"Seek error: {e}")
+
+
 
 # ----------------- Run -----------------
 if __name__ == "__main__":
