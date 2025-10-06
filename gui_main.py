@@ -18,7 +18,7 @@ DATA_DIR = os.path.join(BASE_DIR, 'data')
 SONG_DIR = os.path.join(BASE_DIR, "songs")
 PLAY_COUNTS = os.path.join(DATA_DIR, 'play_counts.json')
 RECENT_HISTORY = os.path.join(DATA_DIR, 'recently_played.json')
-DEFAULT_COVER_URL = "https://cbx-prod.b-cdn.net/COLOURBOX20357576.jpg?width=480&height=480&quality=70"
+DEFAULT_COVER_URL = "https://i.redd.it/wo1p6792qi371.png"
 
 # ----------------- Utility Functions -----------------
 def ensure_dirs():
@@ -340,7 +340,7 @@ class ModernMusicPlayer(QWidget):
         center_container = QFrame()
         center_container.setStyleSheet("background-color: #0A0A0A;")
         center_layout = QVBoxLayout(center_container)
-        center_layout.setContentsMargins(60, 40, 60, 40)
+        center_layout.setContentsMargins(60, 20, 60, 20)
         center_layout.setSpacing(0)
 
         # Main Content Area
@@ -350,11 +350,11 @@ class ModernMusicPlayer(QWidget):
         # Left: Album Cover Section
         album_section = QVBoxLayout()
         album_section.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        album_section.setSpacing(30)
+        album_section.setSpacing(50)
 
         # Album Cover
         cover_container = QFrame()
-        cover_container.setFixedSize(420, 420)
+        cover_container.setFixedSize(650, 750)
         cover_container.setStyleSheet("""
             QFrame {
                 background-color: rgba(10, 10, 10, 0.8);
@@ -365,7 +365,7 @@ class ModernMusicPlayer(QWidget):
         cover_layout.setContentsMargins(10, 10, 10, 10)
         
         self.cover_label = QLabel()
-        self.cover_label.setFixedSize(400, 400)
+        self.cover_label.setFixedSize(630, 730)
         self.cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cover_label.setStyleSheet("""
             border-radius: 8px;
@@ -378,7 +378,7 @@ class ModernMusicPlayer(QWidget):
 
         # Song Info
         self.song_label = QLabel("No song playing")
-        self.song_label.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
+        self.song_label.setFont(QFont("Segoe UI", 20, QFont.Weight.Normal))
         self.song_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.song_label.setStyleSheet("""
             color: #ffffff;
@@ -725,10 +725,10 @@ class ModernMusicPlayer(QWidget):
                 data = response.read()
             pix = QPixmap()
             pix.loadFromData(data)
-            pix = pix.scaled(400, 400, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            pix = pix.scaled(630, 730, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.cover_label.setPixmap(pix)
         except:
-            pix = QPixmap(400, 400)
+            pix = QPixmap(630, 730)
             pix.fill(QColor("#0A0A0A"))
             self.cover_label.setPixmap(pix)
 
@@ -741,7 +741,7 @@ class ModernMusicPlayer(QWidget):
                 data = apics[0].data
                 pix = QPixmap()
                 pix.loadFromData(data)
-                pix = pix.scaled(400, 400, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                pix = pix.scaled(630, 730, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                 self.cover_label.setPixmap(pix)
                 return True
         except:
