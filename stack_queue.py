@@ -10,7 +10,12 @@ class RecentlyPlayed:
         self.max_size = max_size
 
     def push(self, title):
+        # Remove ALL previous instances of this title to prevent duplicates
+        self.stack = [song for song in self.stack if song != title]
+            
+        # Add the title to the top (end) of the stack
         self.stack.append(title)
+        
         if self.max_size is not None and len(self.stack) > self.max_size:
             # Remove the oldest (bottom of stack)
             self.stack.pop(0)

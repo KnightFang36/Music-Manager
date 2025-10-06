@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, json
 from urllib.request import urlopen
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel,
@@ -15,8 +15,59 @@ from player import MusicPlayer
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, 'data')
 SONG_DIR = os.path.join(BASE_DIR, "songs")
+PLAY_COUNTS = os.path.join(DATA_DIR, 'play_counts.json')
+RECENT_HISTORY = os.path.join(DATA_DIR, 'recently_played.json')
 DEFAULT_COVER_URL = "https://i.pinimg.com/originals/48/71/8f/48718f3afca6b1b4296141d5cbd96619.jpg"
+
+# Ensure directories exist
+def ensure_dirs():
+    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(SONG_DIR, exist_ok=True)
+
+# Load play counts from JSON file
+def load_play_counts(heap: SongHeap):
+    if os.path.exists(PLAY_COUNTS):
+        try:
+            with open(PLAY_COUNTS, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                for title, cnt in data.items():
+                    heap.counter[title] = cnt
+            # Rebuild heap after loading counts
+            heap._rebuild_heap()
+        except Exception as e:
+            print('Could not load play counts:', e)
+
+# Save play counts to JSON file
+def save_play_counts(heap: SongHeap):
+    try:
+        # Ensure data directory exists
+        ensure_dirs()
+        with open(PLAY_COUNTS, 'w', encoding='utf-8') as f:
+            json.dump(heap.counter, f, indent=2)
+    except Exception as e:
+        print('Could not save play counts:', e)
+
+# Load recently played songs from JSON file
+def load_recent_history(history: RecentlyPlayed):
+    if os.path.exists(RECENT_HISTORY):
+        try:
+            with open(RECENT_HISTORY, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                # Replace the stack with loaded data
+                history.stack = data.get('history', [])
+        except Exception as e:
+            print('Could not load recently played history:', e)
+
+# Save recently played songs to JSON file
+def save_recent_history(history: RecentlyPlayed):
+    try:
+        ensure_dirs()
+        with open(RECENT_HISTORY, 'w', encoding='utf-8') as f:
+            json.dump({'history': history.stack}, f, indent=2)
+    except Exception as e:
+        print('Could not save recently played history:', e)
 
 
 class SpotifyStyleGUI(QWidget):
@@ -29,13 +80,17 @@ class SpotifyStyleGUI(QWidget):
         # Core modules
         self.playlist = Playlist()
         self.song_map = SongMap()
-        self.history = RecentlyPlayed()
+        self.history = RecentlyPlayed(max_size=20)  # Increase max size to 20
         self.heap = SongHeap()
         self.bst = None  # BST for sorting
         self.player = MusicPlayer()
         self.current_node = None
         self.playing = False
         self.upcoming = UpcomingSongs()
+
+        # Load play counts and history from file
+        load_play_counts(self.heap)
+        load_recent_history(self.history)
 
         self.setup_ui()
         self.load_songs()
@@ -399,6 +454,9 @@ class SpotifyStyleGUI(QWidget):
         self.player.play(node.path)
         self.history.push(node.title)
         self.heap.add_play(node.title)
+        # Save play counts and recently played history to file
+        save_play_counts(self.heap)
+        save_recent_history(self.history)
         self.playing = True
         self.play_pause_btn.setText("||")
 
