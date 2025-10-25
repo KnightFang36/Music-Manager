@@ -75,14 +75,14 @@ class BST:
         # Duplicate titles are ignored, no insertion
 
     def inorder(self):
-        # Return list of titles in sorted order
+        # Return list of titles in sorted reverse  order
         result = []
 
         def _inorder(node):
             if node:
-                _inorder(node.left)
-                result.append(node.title)
                 _inorder(node.right)
+                result.append(node.title)
+                _inorder(node.left)
 
         _inorder(self.root)
         return result
