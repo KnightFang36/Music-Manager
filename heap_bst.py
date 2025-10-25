@@ -80,9 +80,9 @@ class BST:
 
         def _inorder(node):
             if node:
-                _inorder(node.right)
-                result.append(node.title)
                 _inorder(node.left)
+                result.append(node.title)
+                _inorder(node.right)
 
         _inorder(self.root)
         return result

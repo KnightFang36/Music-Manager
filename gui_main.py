@@ -250,26 +250,27 @@ class ModernMusicPlayer(QWidget):
         side_layout.addLayout(pl_header)
 
         # Sort Toggle
-        self.sort_toggle = QCheckBox("Alphabetical")
+        self.sort_toggle = QCheckBox("Z-A Order")
         self.sort_toggle.setStyleSheet("""
-            QCheckBox {
-                color: #cccccc;
-                font-size: 13px;
-                spacing: 8px;
-                max-width: 120px;
+             QCheckBox {
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: 500;
+                padding: 5px;
             }
             QCheckBox::indicator {
-                width: 30px;
+                width: 20px;
                 height: 20px;
+                border: 2px solid #D94F00;
                 border-radius: 10px;
-                background-color: rgba(60, 60, 60, 0.7);
-                border: 1px solid rgba(80, 80, 80, 0.5);
+                background-color: transparent;
             }
             QCheckBox::indicator:checked {
                 background-color: #D94F00;
-                border: 1px solid #D94F00;
+                border: 2px solid #D94F00;
             }
         """)
+        
         self.sort_toggle.stateChanged.connect(self.update_playlist_display)
         side_layout.addWidget(self.sort_toggle)
 
@@ -438,7 +439,7 @@ class ModernMusicPlayer(QWidget):
         self.play_next_upcoming_btn.clicked.connect(self.play_next_from_upcoming)
         side_layout.addWidget(self.play_next_upcoming_btn)
 
-        self.autoplay_checkbox = QCheckBox("🔄 Autoplay Queue")
+        self.autoplay_checkbox = QCheckBox("Autoplay Queue")
         self.autoplay_checkbox.setStyleSheet("""
             QCheckBox {
                 color: #ffffff;
@@ -447,10 +448,10 @@ class ModernMusicPlayer(QWidget):
                 padding: 5px;
             }
             QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
+                width: 20px;
+                height: 20px;
                 border: 2px solid #D94F00;
-                border-radius: 4px;
+                border-radius: 10px;
                 background-color: transparent;
             }
             QCheckBox::indicator:checked {
@@ -868,7 +869,7 @@ class ModernMusicPlayer(QWidget):
         self.list_widget.clear()
         filter_text = self.search_input.text().strip().lower() if self.search_input else ""
         if self.sort_toggle.isChecked():
-            sorted_titles = self.get_bst_sorted_titles()
+            sorted_titles = list(reversed(self.get_bst_sorted_titles()))
             for title in sorted_titles:
                 if not filter_text or filter_text in title.lower():
                     self.list_widget.addItem(title)
